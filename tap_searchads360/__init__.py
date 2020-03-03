@@ -27,7 +27,7 @@ def get_catalog(streams):
 
 def discover():
     logger.info('Starting discover ..')
-    streams = [Stream(stream_name) for stream_name in AVAILABLE_STREAMS]
+    streams = [SearchAdsStream(stream_name) for stream_name in AVAILABLE_STREAMS]
     catalog = get_catalog(streams)
     logger.info('Finished discover ..')
     return json.dump(catalog, sys.stdout, indent=2)
