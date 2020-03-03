@@ -1,1 +1,1 @@
-include tap_searchads360/*.json
+include tap_searchads360/schemas/*.json

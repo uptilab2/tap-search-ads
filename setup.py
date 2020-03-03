@@ -12,6 +12,7 @@ setup(
     install_requires=[
         'singer-python>=5.9.0',
         'requests>=2.20.0',
+        'pandas>=0.23.4'
     ],
     entry_points='''
         [console_scripts]
@@ -19,7 +20,7 @@ setup(
     ''',
     packages=['tap_searchads360'],
     package_data={
-        'tap_searchads360': ['tap_searchads360/*.json']
+        'tap_searchads360': ['schemas/*.json']
     },
     include_package_data=True
 )
