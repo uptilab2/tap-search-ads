@@ -6,7 +6,7 @@ from .client import GoogleSearchAdsClient
 from .streams import SearchAdsStream, AVAILABLE_STREAMS
 
 logger = singer.get_logger()
-REQUIRED_CONFIG_KEYS = ['client_id', 'client_secret', 'refresh_token', 'start_date', 'end_date', 'agency_id', 'advertiser_id', 'engineAccount_id']
+REQUIRED_CONFIG_KEYS = ['client_id', 'client_secret', 'refresh_token', 'start_date', 'agency_id', 'advertiser_id', 'engineAccount_id']
 
 def get_catalog(streams):
     catalog = {}
@@ -25,9 +25,9 @@ def get_catalog(streams):
         catalog['streams'].append(catalog_entry)
     return catalog
 
-def discover():
+def discover(config=None):
     logger.info('Starting discover ..')
-    streams = [SearchAdsStream(stream_name) for stream_name in AVAILABLE_STREAMS]
+    streams = [SearchAdsStream(stream_name, config=config) for stream_name in AVAILABLE_STREAMS]
     catalog = get_catalog(streams)
     logger.info('Finished discover ..')
     return json.dump(catalog, sys.stdout, indent=2)
@@ -53,7 +53,7 @@ def main():
     
     with client:
         if args.discover:
-            discover()
+            discover(config=args.config)
         else:
             sync(client=client, config=args.config, catalog=args.catalog, state=args.state)
     

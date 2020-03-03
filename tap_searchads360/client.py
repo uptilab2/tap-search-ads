@@ -87,6 +87,7 @@ class GoogleSearchAdsClient:
         elif response.status_code == 401 and resp['error']['errors'][0]['reason'] == 'expired':
             raise ClientExpiredError(f'Token is expired, retry ..')
         else:
+            resp = response.json()
             message = resp['error']['errors'][0]['message']
             raise ClientHttpError(f'{response.status_code}: {message}')
 
