@@ -80,7 +80,6 @@ class GoogleSearchAdsClient:
             kwargs['headers'] = {"Content-Type": "application/json"}
         
         response = req(url=url, **kwargs)
-
         if response.status_code == 200 or 202:
             return response
         elif response.status_code == 429:
@@ -94,11 +93,13 @@ class GoogleSearchAdsClient:
     def request_report(self, payloads):
         response = self.do_request(BASE_API_URL, data=json.dumps(payloads))
         resp = response.json()
+        logger.info(resp)
         return resp.get('id', '')
 
     def process_files(self, report_id):
         response = self.do_request(BASE_API_URL+'/'+report_id)
         resp = response.json()
+        logger.info(resp)
         if resp.get('isReportReady', False):
             return resp.get('files', [])
         return False
@@ -128,8 +129,11 @@ class GoogleSearchAdsClient:
         for file_url in files:
             d = self.extract_data(file_url.get('url'))
             data.append(d)
-        df = data[0].append(data[1:])
-        return df.to_dict(orient='records')
+        if data:
+            df = data[0].append(data[1:])
+            return df.to_dict(orient='records')
+        else:
+            return {}
 
     def extract_data(self, file_url):
         # To download file we have to set the token on the header

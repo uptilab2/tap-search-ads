@@ -40,7 +40,6 @@ def sync(client, config, catalog, state):
         # Each stream can be very long in time, because google needs to generate CSV files then we downloads and parse them.
         thread = threading.Thread(target=stream.write, args=(catalog_entry.metadata,))
         thread.start()
-    logger.info('Finished Sync..')
 
 
 @singer.utils.handle_top_exception(logger)
