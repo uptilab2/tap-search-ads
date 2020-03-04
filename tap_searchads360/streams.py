@@ -46,17 +46,26 @@ class SearchAdsStream(Stream):
         super().__init__(name, **kwargs)
         self.key_properties = [name+'Id']
         # setting up optional config
-        if 'metrics_date_segment' in self.config:
-            if self.config['metrics_date_segment']:
+        if 'metrics_date_segment' in self.config and self.config['metrics_date_segment']:
+            schema = self.load_schema()
+            if any([prop for prop in schema['properties'] if prop == 'date']):
                 self.replication_key = 'date'
                 self.valid_replication_keys = ['date']
+        # set replicat_method for reports that have specific properties
+        if name in SPECIFIC_REPLICATION_KEYS:
+            self.replication_key = name+'Date'
+            self.valid_replication_keys = [name+'Date']
 
     def selected_properties(self, metadata):
         # add selected false to properties we don't want
-        print(metadata)
-        mdata, columns = [(field, field['breadcrumb'][1]) for field in metadata if 'date' not in field['breadcrumb']]
-        print(mdata)
-        mdata.append({'breadcrumb':['properties', 'date'], 'metadata': {'inclusion': 'available', 'selected':'false'}})
+        mdata, columns = metadata, []
+        for field in mdata:
+            if field['breadcrumb']:
+                columns.append(field['breadcrumb'][1])
+                if 'metrics_date_segment' in self.config and not self.config['metrics_date_segment']:
+                    if 'date' in field['breadcrumb']:
+                        field['metadata'].update(selected = 'false')
+                        columns.pop(-1)
         return columns, mdata
 
     def write(self, metadata):
@@ -116,7 +125,10 @@ class SearchAdsStream(Stream):
                                 counter.increment()
             self.state = singer.write_bookmark(state=self.state, tap_stream_id=self.name, key=self.replication_key, val=new_bookmark)
 
-    
+SPECIFIC_REPLICATION_KEYS = [
+    'conversion',
+    'visit'
+]    
 
 AVAILABLE_STREAMS = [
     'account',
