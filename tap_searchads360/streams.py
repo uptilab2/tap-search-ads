@@ -4,12 +4,56 @@ from datetime import datetime, timedelta
 
 logger = singer.get_logger()
 
+
+SPECIFIC_REPLICATION_KEYS = [
+    {'conversion': 'conversionDate'},
+    {'visit': 'visitDate'}
+]    
+AVAILABLE_SEGMENT_DATE = [
+    'date',
+    'monthStart',
+    'monthEnd',
+    'quarterStart',
+    'quarterEnd',
+    'weekStart',
+    'weekEnd',
+    'yearStart',
+    'yearEnd'
+]
+AVAILABLE_STREAMS = [
+    'account',
+    'ad',
+    'adGroup',
+    'adGroupTarget',
+    'advertiser',
+    'bidStrategy',
+    'campaign',
+    'campaignTarget',
+    'conversion',
+    'feedItem',
+    'floodlightActivity',
+    'keyword',
+    'negativeAdGroupKeyword',
+    'negativeAdGroupTarget',
+    'negativeCampaignKeyword',
+    'negativeCampaignTarget',
+    'paidAndOrganic',
+    'productAdvertised',
+    'productGroup',
+    'productLeadAndCrossSell',
+    'productTarget',
+    'visit'
+]
+
 class DateRangeError(Exception):
     pass
 
+class SegmentValueError(Exception):
+    pass
+
 class Stream:
-    replication_method = 'FULL_TABLE'
-    forced_replication_method = 'FULL_TABLE'
+    replication_method = 'INCREMENTAL'
+    forced_replication_method = 'INCREMENTAL'
     valid_replication_keys = []
 
     def __init__(self, name, client=None, config=None, catalog_stream=None, state=None):
@@ -37,8 +81,6 @@ class Stream:
 
     
 class SearchAdsStream(Stream):
-    replication_method = 'INCREMENTAL'
-    forced_replication_method = 'INCREMENTAL'
     valid_replication_keys = ['lastModifiedTimestamp']
     replication_key = 'lastModifiedTimestamp'
 
@@ -46,26 +88,41 @@ class SearchAdsStream(Stream):
         super().__init__(name, **kwargs)
         self.key_properties = [name+'Id']
         # setting up optional config
-        if 'metrics_date_segment' in self.config and self.config['metrics_date_segment']:
+        # date segment is used here as replication key
+        if 'date_segment' in self.config and self.config['date_segment']:
             schema = self.load_schema()
-            if any([prop for prop in schema['properties'] if prop == 'date']):
-                self.replication_key = 'date'
-                self.valid_replication_keys = ['date']
+            if any([prop for prop in schema['properties'] if prop == self.config['date_segment']]):
+                self.replication_key = self.config['date_segment']
+                self.valid_replication_keys = [self.config['date_segment']]
         # set replicat_method for reports that have specific properties
         if name in SPECIFIC_REPLICATION_KEYS:
-            self.replication_key = name+'Date'
-            self.valid_replication_keys = [name+'Date']
+            self.replication_key = SPECIFIC_REPLICATION_KEYS[name]
+            self.valid_replication_keys = SPECIFIC_REPLICATION_KEYS[name]
 
     def selected_properties(self, metadata):
+        """
+            This function does:
+             - return columns to make the request body.
+             - return metadata with the property "selected:false" on segment date that we don't need
+               because we can select only one segment per report.
+
+            if date_segment option is empty "selected:false" property is apply to all segment.
+        """
+        mdata, columns, unselect_segment_date = metadata, [], AVAILABLE_SEGMENT_DATE
+        # check if date segment exists
+        if 'date_segment' in self.config and self.config['date_segment']:
+            if self.config['date_segment'] in AVAILABLE_SEGMENT_DATE:
+                unselect_segment_date.remove(self.config['date_segment'])
+            else:
+                raise SegmentValueError(f"Can not found the segment '{self.config['date_segment']}'. Segment available are {', '.join(AVAILABLE_SEGMENT_DATE)}")
+        
         # add selected false to properties we don't want
-        mdata, columns = metadata, []
         for field in mdata:
             if field['breadcrumb']:
                 columns.append(field['breadcrumb'][1])
-                if 'metrics_date_segment' in self.config and not self.config['metrics_date_segment']:
-                    if 'date' in field['breadcrumb']:
-                        field['metadata'].update(selected = 'false')
-                        columns.pop(-1)
+                if field['breadcrumb'][1] in unselect_segment_date:
+                    field['metadata'].update(selected = 'false')
+                    columns.pop(-1)
         return columns, mdata
 
     def write(self, metadata):
@@ -125,32 +182,3 @@ class SearchAdsStream(Stream):
                                 counter.increment()
             self.state = singer.write_bookmark(state=self.state, tap_stream_id=self.name, key=self.replication_key, val=new_bookmark)
 
-SPECIFIC_REPLICATION_KEYS = [
-    'conversion',
-    'visit'
-]    
-
-AVAILABLE_STREAMS = [
-    'account',
-    'ad',
-    'adGroup',
-    'adGroupTarget',
-    'advertiser',
-    'bidStrategy',
-    'campaign',
-    'campaignTarget',
-    'conversion',
-    'feedItem',
-    'floodlightActivity',
-    'keyword',
-    'negativeAdGroupKeyword',
-    'negativeAdGroupTarget',
-    'negativeCampaignKeyword',
-    'negativeCampaignTarget',
-    'paidAndOrganic',
-    'productAdvertised',
-    'productGroup',
-    'productLeadAndCrossSell',
-    'productTarget',
-    'visit'
-]

@@ -56,7 +56,8 @@ Tap config.json parameters:
 - advertiser_id: unique identifier of your advertiser
 - engineAccount_id: unique identifier of the account in the external engine account
 - start_date: Inclusive date in YYYY-MM-DD format
-- end_date: Inclusive date in YYYY-MM-DD format
+- end_date: Inclusive date in YYYY-MM-DD format (optional: if is not added in config, end_date will be the current day)
+- date_segment: Segments the report by date (optional: current list available segment date: 'date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd')
 
 3. Run the tap in discovery mode to get catalog.json file
 
