@@ -1,5 +1,6 @@
 import os
 import singer
+from copy import copy
 from datetime import datetime, timedelta
 
 logger = singer.get_logger()
@@ -111,7 +112,7 @@ class SearchAdsStream(Stream):
 
             if date_segment option is empty "selected:false" property is apply to all segment.
         """
-        mdata, columns, unselect_segment_date = metadata, [], AVAILABLE_SEGMENT_DATE
+        mdata, columns, unselect_segment_date = metadata, [], copy(AVAILABLE_SEGMENT_DATE)
         # check if date segment exists
         if 'date_segment' in self.config and self.config['date_segment']:
             if self.config['date_segment'] in AVAILABLE_SEGMENT_DATE:
