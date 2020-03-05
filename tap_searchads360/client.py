@@ -80,6 +80,7 @@ class GoogleSearchAdsClient:
             kwargs['headers'] = {"Content-Type": "application/json"}
         
         response = req(url=url, **kwargs)
+        logger.info(f'request api: {url}, response status: {response.status_code}')
         if response.status_code == 200 or 202:
             return response
         elif response.status_code == 429:
@@ -99,7 +100,6 @@ class GoogleSearchAdsClient:
     def process_files(self, report_id):
         response = self.do_request(BASE_API_URL+'/'+report_id)
         resp = response.json()
-        logger.info(resp)
         if resp.get('isReportReady', False):
             return resp.get('files', [])
         return False
@@ -130,20 +130,21 @@ class GoogleSearchAdsClient:
                 d = self.extract_data(file_url.get('url'))
                 data.append(d)
             if data:
-                df = data[0].append(data[1:]) if len(data) > 0 else data[0]
+                if len(data) > 0:
+                    [data[0].append(d) for d in data if not d.equals(data[0])]
+                df = data[0]
                 return df.to_dict(orient='records')
             else:
                 return {}
-
+            
     def extract_data(self, file_url):
         # To download file we have to set the token on the header
         headers = {'Authorization': 'Bearer '+self.access_token}
         file_tmp = tempfile.NamedTemporaryFile(dir='/tmp', suffix='.csv')
-        response = self.do_request(file_url, headers=headers, stream=True)
+        response = self.do_request(file_url, headers=headers)
         file_tmp.write(response.content)
         file_tmp.seek(0)
         df = pandas.read_csv(file_tmp)
         df = df.where(pandas.notnull(df), None)
-        logger.info(df)
         return df
         
