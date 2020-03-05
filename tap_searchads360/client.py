@@ -80,8 +80,6 @@ class GoogleSearchAdsClient:
             kwargs['headers'] = {"Content-Type": "application/json"}
         
         response = req(url=url, **kwargs)
-        logger.info(response.status_code)
-        logger.info(response.text)
         if response.status_code == 200 or 202:
             return response
         elif response.status_code == 429:
@@ -133,7 +131,7 @@ class GoogleSearchAdsClient:
             d = self.extract_data(file_url.get('url'))
             data.append(d)
         if data:
-            df = data[0].append(data[1:])
+            df = data[0].append(data[1:]) if len(data) > 0 else data[0]
             return df.to_dict(orient='records')
         else:
             return {}

@@ -126,6 +126,8 @@ class SearchAdsStream(Stream):
         return columns, mdata
 
     def write(self, metadata):
+        if self.name == 'account':
+            raise DateRangeError('this is a test')
         self.write_schema()
         self.sync(metadata)
         self.write_state()
