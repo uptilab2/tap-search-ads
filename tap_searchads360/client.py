@@ -94,7 +94,6 @@ class GoogleSearchAdsClient:
     def request_report(self, payloads):
         response = self.do_request(BASE_API_URL, data=json.dumps(payloads))
         resp = response.json()
-        logger.info(resp)
         return resp.get('id', '')
 
     def process_files(self, report_id):
@@ -118,23 +117,23 @@ class GoogleSearchAdsClient:
                 logger.info(f'Report is not ready yet, next request in {POLLING_TIME} sec..')
                 time.sleep(POLLING_TIME)
         logger.info('finished polling..')
-        logger.info(files)
         return files
 
     def get_data(self, request_body):
         report_id = self.request_report(request_body)
         logger.info(f'Requested report: {report_id}')
         files = self.get_files_link(report_id)
-        logger.info('try to extract files')
-        data = []
-        for file_url in files:
-            d = self.extract_data(file_url.get('url'))
-            data.append(d)
-        if data:
-            df = data[0].append(data[1:]) if len(data) > 0 else data[0]
-            return df.to_dict(orient='records')
-        else:
-            return {}
+        if files:
+            logger.info('try to extract files')
+            data = []
+            for file_url in files:
+                d = self.extract_data(file_url.get('url'))
+                data.append(d)
+            if data:
+                df = data[0].append(data[1:]) if len(data) > 0 else data[0]
+                return df.to_dict(orient='records')
+            else:
+                return {}
 
     def extract_data(self, file_url):
         # To download file we have to set the token on the header

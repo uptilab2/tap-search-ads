@@ -51,6 +51,9 @@ class DateRangeError(Exception):
 class SegmentValueError(Exception):
     pass
 
+class DataIsMissingError(Exception):
+    pass
+
 class Stream:
     replication_method = 'INCREMENTAL'
     forced_replication_method = 'INCREMENTAL'
@@ -125,15 +128,15 @@ class SearchAdsStream(Stream):
                     columns.pop(-1)
         return columns, mdata
 
-    def write(self, metadata):
-        if self.name == 'account':
-            raise DateRangeError('this is a test')
-        self.write_schema()
-        self.sync(metadata)
-        self.write_state()
-        logger.info(f'Finished sync stream: {self.name}')
+    def write(self):
+        if self.data:
+            self.write_schema()
+            self.sync(self.metadata)
+            self.write_state()
+        else:
+            raise DataIsMissingError(f"Something went wrong can not continue the run")
 
-    def request_data(self, columns):
+    def request_body(self, columns):
         yesterday = datetime.now() - timedelta(days=1)
         default_end_date = yesterday.strftime('%Y-%m-%d')
         if self.config['start_date'][:10] > str(yesterday) and 'end_date' not in self.config:
@@ -142,8 +145,7 @@ class SearchAdsStream(Stream):
         payloads = {
             'reportScope':{
                 'agencyId': self.config['agency_id'],
-                'advertiserId': self.config['advertiser_id'],
-                'engineAccountId': self.config['engineAccount_id']
+                'advertiserId': self.config['advertiser_id']
             },
             'reportType': self.name,
             'columns': [{'columnName': column_name} for column_name in columns],
@@ -157,7 +159,14 @@ class SearchAdsStream(Stream):
         }
         if 'end_date' in self.config:
             payloads['timeRange']['endDate'] = self.config['end_date'][:10]
+        # advertiser report is the only one who don't need engineAccount_id
+        if self.name != 'advertiser':
+            payloads['reportScope']['engineAccountId']: self.config['engineAccount_id']
         return payloads
+
+    def request_data(self, metadata):
+        columns, self.metadata = self.selected_properties(metadata)
+        self.data = self.client.get_data(self.request_body(columns))
 
     def get_bookmark(self):
         bookmark = singer.get_bookmark(state=self.state, tap_stream_id=self.name, key=self.replication_key)
@@ -168,16 +177,14 @@ class SearchAdsStream(Stream):
     def sync(self, mdata):
         logger.info(f'syncing {self.name}')
         schema = self.load_schema()
-        columns, metadata = self.selected_properties(mdata)
-        data = self.client.get_data(self.request_data(columns))
-        if data:
+        if self.data:
             bookmark = self.get_bookmark()
             new_bookmark = bookmark
             with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
                 with singer.metrics.record_counter(endpoint=self.name) as counter:
-                    for d in data:
+                    for d in self.data:
                         with singer.Transformer(integer_datetime_fmt="unix-seconds-integer-datetime-parsing") as transformer:
-                            transformed_record = transformer.transform(data=d, schema=schema, metadata=singer.metadata.to_map(metadata))
+                            transformed_record = transformer.transform(data=d, schema=schema, metadata=singer.metadata.to_map(self.metadata))
                             new_bookmark = max(new_bookmark, transformed_record.get(self.replication_key))
                             if (self.replication_method == 'INCREMENTAL' and transformed_record.get(self.replication_key) > bookmark) or self.replication_method == 'FULL_TABLE':
                                 singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=transformed_record)

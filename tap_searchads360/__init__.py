@@ -1,14 +1,14 @@
 import json
 import singer
 import sys
-import threading
+from threading import Thread
 from .client import GoogleSearchAdsClient
 from .streams import SearchAdsStream, AVAILABLE_STREAMS
 
 logger = singer.get_logger()
 REQUIRED_CONFIG_KEYS = ['client_id', 'client_secret', 'refresh_token', 'start_date', 'agency_id', 'advertiser_id', 'engineAccount_id']
 THREADS = []
-
+STREAMS = []
 def get_catalog(streams):
     catalog = {}
     catalog['streams'] = []
@@ -35,15 +35,26 @@ def discover(config=None):
 
 def sync(client, config, catalog, state):
     logger.info('Starting Sync..')
+    # request all data first
     for catalog_entry in catalog.get_selected_streams(state):
         stream = SearchAdsStream(name=catalog_entry.stream, client=client, config=config, catalog_stream=catalog_entry.stream, state=state)
-        logger.info('Syncing stream: %s', catalog_entry.stream)
         # Each stream can be very long in time, because google needs to generate CSV files then we downloads and parse them.
-        THREADS.append(threading.Thread(target=stream.write, args=(catalog_entry.metadata,)))
-
-    for thread in THREADS:
+        thread = Thread(target=stream.request_data, args=(catalog_entry.metadata,))
         thread.start()
+        THREADS.append(thread)
+        STREAMS.append(stream)
 
+    # wait until it is finished
+    for thread in THREADS:
+        thread.join()
+
+    logger.info('Finished request all the data')
+
+    for stream in STREAMS:
+        stream.write()
+
+    logger.info(f'Finished sync..')
+    
 @singer.utils.handle_top_exception(logger)
 def main():
     args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
