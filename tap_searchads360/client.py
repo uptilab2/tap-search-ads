@@ -80,6 +80,8 @@ class GoogleSearchAdsClient:
             kwargs['headers'] = {"Content-Type": "application/json"}
         
         response = req(url=url, **kwargs)
+        logger.info(response.status_code)
+        logger.info(response.text)
         if response.status_code == 200 or 202:
             return response
         elif response.status_code == 429:
@@ -139,7 +141,7 @@ class GoogleSearchAdsClient:
     def extract_data(self, file_url):
         # To download file we have to set the token on the header
         headers = {'Authorization': 'Bearer '+self.access_token}
-        file_tmp = tempfile.NamedTemporaryFile(dir='/tmp', suffix='.csv', buffering=0)
+        file_tmp = tempfile.NamedTemporaryFile(dir='/tmp', suffix='.csv')
         response = self.do_request(file_url, headers=headers, stream=True)
         file_tmp.write(response.content)
         file_tmp.seek(0)
