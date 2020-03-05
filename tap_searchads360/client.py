@@ -144,5 +144,6 @@ class GoogleSearchAdsClient:
         file_tmp.seek(0)
         df = pandas.read_csv(file_tmp)
         df = df.where(pandas.notnull(df), None)
+        logger.info(df)
         return df
         
