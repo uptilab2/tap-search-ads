@@ -150,7 +150,7 @@ class SearchAdsStream(Stream):
                 'endDate': default_end_date
             },
             'downloadFormat': 'CSV',
-            'maxRowsPerFile': 100000000,
+            'maxRowsPerFile': 1000000, # min rows value
             'statisticsCurrency': 'agency'
         }
         if 'end_date' in self.config:

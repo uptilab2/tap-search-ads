@@ -38,9 +38,11 @@ def sync(client, config, catalog, state):
         stream = SearchAdsStream(name=catalog_entry.stream, client=client, config=config, catalog_stream=catalog_entry.stream, state=state)
         logger.info('Syncing stream: %s', catalog_entry.stream)
         # Each stream can be very long in time, because google needs to generate CSV files then we downloads and parse them.
-        thread = threading.Thread(target=stream.write, args=(catalog_entry.metadata,))
-        thread.start()
-
+        try:
+            thread = threading.Thread(target=stream.write, args=(catalog_entry.metadata,))
+            thread.start()
+        except Exception as e:
+            raise e
 
 @singer.utils.handle_top_exception(logger)
 def main():
