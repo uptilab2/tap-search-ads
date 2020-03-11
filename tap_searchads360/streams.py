@@ -87,6 +87,7 @@ class Stream:
 class SearchAdsStream(Stream):
     valid_replication_keys = ['lastModifiedTimestamp']
     replication_key = 'lastModifiedTimestamp'
+    data = []
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -103,7 +104,7 @@ class SearchAdsStream(Stream):
             self.replication_key = SPECIFIC_REPLICATION_KEYS[name]
             self.valid_replication_keys = SPECIFIC_REPLICATION_KEYS[name]
 
-    def selected_properties(self, metadata):
+    def selected_properties(self, metadata, fields=None):
         """
             This function does:
              - return columns to make the request body.
@@ -119,14 +120,16 @@ class SearchAdsStream(Stream):
                 unselect_segment_date.remove(self.config['date_segment'])
             else:
                 raise SegmentValueError(f"Can not found the segment '{self.config['date_segment']}'. Segment available are {', '.join(AVAILABLE_SEGMENT_DATE)}")
-        
         # add selected false to properties we don't want
         for field in mdata:
             if field['breadcrumb']:
                 columns.append(field['breadcrumb'][1])
-                if field['breadcrumb'][1] in unselect_segment_date:
+                if field['breadcrumb'][1] in unselect_segment_date or \
+                    fields and field['breadcrumb'][1] not in fields:
                     field['metadata'].update(selected = 'false')
                     columns.pop(-1)
+        logger.info(columns)
+        logger.info(mdata)
         return columns, mdata
 
     def write(self):
@@ -137,7 +140,7 @@ class SearchAdsStream(Stream):
         else:
             raise DataIsMissingError(f"Something went wrong can not continue the run")
 
-    def request_body(self, columns):
+    def request_body(self, columns, filters=None):
         yesterday = datetime.now() - timedelta(days=1)
         default_end_date = yesterday.strftime('%Y-%m-%d')
         if self.config['start_date'][:10] > str(yesterday) and 'end_date' not in self.config:
@@ -163,11 +166,24 @@ class SearchAdsStream(Stream):
         # advertiser report is the only one who don't need engineAccount_id
         if self.name != 'advertiser':
             payloads['reportScope']['engineAccountId']: self.config['engineAccount_id']
+        if filters:
+            payloads['filters'] = [{
+                "column": {"columnName" : f['field']},
+                "operator": f['operator'],
+                "values": [f['value']],
+            }
+            for f in filters]
         return payloads
 
     def request_data(self, metadata):
-        columns, self.metadata = self.selected_properties(metadata)
-        self.data = self.client.get_data(self.request_body(columns))
+        fields = None
+        filters = None
+        if self.config['report_fields'] and self.name in self.config['report_fields']:
+            fields = self.config['report_fields'][self.name]
+        if self.config['report_fields'] and self.name in self.config['report_fields']:
+            filters = self.config['filters']
+        columns, self.metadata = self.selected_properties(metadata, fields=fields)
+        self.data = self.client.get_data(self.request_body(columns, filters=filters))
 
     def get_bookmark(self):
         bookmark = singer.get_bookmark(state=self.state, tap_stream_id=self.name, key=self.replication_key)

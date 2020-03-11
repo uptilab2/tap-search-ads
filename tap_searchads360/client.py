@@ -81,6 +81,7 @@ class GoogleSearchAdsClient:
         
         response = req(url=url, **kwargs)
         logger.info(f'request api: {url}, response status: {response.status_code}')
+        # TODO: why is not returning error when status_code is 400
         if response.status_code == 200 or 202:
             return response
         elif response.status_code == 429:
@@ -90,6 +91,7 @@ class GoogleSearchAdsClient:
         else:
             resp = response.json()
             message = resp['error']['errors'][0]['message']
+            logger.info(message)
             raise ClientHttpError(f'{response.status_code}: {message}')
 
     def request_report(self, payloads):
@@ -122,20 +124,21 @@ class GoogleSearchAdsClient:
     def get_data(self, request_body):
         report_id = self.request_report(request_body)
         logger.info(f'Requested report: {report_id}')
-        files = self.get_files_link(report_id)
-        if files:
-            logger.info('try to extract files')
-            data = []
-            for file_url in files:
-                d = self.extract_data(file_url.get('url'))
-                data.append(d)
-            if data:
-                if len(data) > 0:
-                    [data[0].append(d) for d in data if not d.equals(data[0])]
-                df = data[0]
-                return df.to_dict(orient='records')
-            else:
-                return {}
+        if report_id:
+            files = self.get_files_link(report_id)
+            if files:
+                logger.info('try to extract files')
+                data = []
+                for file_url in files:
+                    d = self.extract_data(file_url.get('url'))
+                    data.append(d)
+                if data:
+                    if len(data) > 0:
+                        [data[0].append(d) for d in data if not d.equals(data[0])]
+                    df = data[0]
+                    return df.to_dict(orient='records')
+                else:
+                    return {}
             
     def extract_data(self, file_url):
         # To download file we have to set the token on the header
