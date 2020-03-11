@@ -128,8 +128,6 @@ class SearchAdsStream(Stream):
                     fields and field['breadcrumb'][1] not in fields:
                     field['metadata'].update(selected = 'false')
                     columns.pop(-1)
-        logger.info(columns)
-        logger.info(mdata)
         return columns, mdata
 
     def write(self):
@@ -178,9 +176,9 @@ class SearchAdsStream(Stream):
     def request_data(self, metadata):
         fields = None
         filters = None
-        if self.config['report_fields'] and self.name in self.config['report_fields']:
+        if 'report_fields' in self.config and self.name in self.config['report_fields']:
             fields = self.config['report_fields'][self.name]
-        if self.config['report_fields'] and self.name in self.config['report_fields']:
+        if 'filters' in self.config:
             filters = self.config['filters']
         columns, self.metadata = self.selected_properties(metadata, fields=fields)
         self.data = self.client.get_data(self.request_body(columns, filters=filters))
