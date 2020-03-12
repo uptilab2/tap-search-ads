@@ -1,14 +1,13 @@
 import json
 import singer
 import sys
-from threading import Thread
 from .client import GoogleSearchAdsClient
 from .streams import SearchAdsStream, AVAILABLE_STREAMS
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = singer.get_logger()
 REQUIRED_CONFIG_KEYS = ['client_id', 'client_secret', 'refresh_token', 'start_date', 'agency_id', 'advertiser_id', 'engineAccount_id']
-THREADS = []
-STREAMS = []
+
 def get_catalog(streams):
     catalog = {}
     catalog['streams'] = []
@@ -36,23 +35,19 @@ def discover(config=None):
 def sync(client, config, catalog, state):
     logger.info('Starting Sync..')
     # request all data first
-    for catalog_entry in catalog.get_selected_streams(state):
-        stream = SearchAdsStream(name=catalog_entry.stream, client=client, config=config, catalog_stream=catalog_entry.stream, state=state)
-        # Each stream can be very long in time, because google needs to generate CSV files then we downloads and parse them.
-        thread = Thread(target=stream.request_data, args=(catalog_entry.metadata,))
-        thread.start()
-        THREADS.append(thread)
-        STREAMS.append(stream)
+    futures = []
+    with ThreadPoolExecutor() as executor:
+        for catalog_entry in catalog.get_selected_streams(state):
+            stream = SearchAdsStream(name=catalog_entry.stream, client=client, config=config, catalog_stream=catalog_entry.stream, state=state)
+            # Each stream can be very long in time, because google needs to generate CSV files then we downloads and parse them.
+            futures.append(executor.submit(stream.write, catalog_entry.metadata))
 
-    # wait until it is finished
-    for thread in THREADS:
-        thread.join()
-
-    logger.info('Finished request all the data')
-
-    for stream in STREAMS:
-        stream.write()
-
+    for routine in as_completed(futures):
+        try:
+            routine.result()
+        except Exception:
+            logger.info('Error in threadpool, can not finish the sync')
+            raise
     logger.info(f'Finished sync..')
     
 @singer.utils.handle_top_exception(logger)

@@ -10,7 +10,7 @@ SPECIFIC_REPLICATION_KEYS = [
     {'conversion': 'conversionDate'},
     {'visit': 'visitDate'}
 ]    
-AVAILABLE_SEGMENT_DATE = [
+AVAILABLE_SEGMENT = [
     'date',
     'monthStart',
     'monthEnd',
@@ -19,7 +19,54 @@ AVAILABLE_SEGMENT_DATE = [
     'weekStart',
     'weekEnd',
     'yearStart',
-    'yearEnd'
+    'yearEnd',
+    'deviceSegment',
+    'floodlightGroup',
+    'floodlightGroupId',
+    'floodlightGroupTag',
+    'floodlightActivity',
+    'floodlightActivityId',
+    'floodlightActivityTag',
+    'sitelinkDisplayText',
+    'sitelinkDescription1',
+    'sitelinkDescription2',
+    'sitelinkLandingPageUrl',
+    'sitelinkClickserverUrl',
+    'locationBusinessName',
+    'locationCategory',
+    'locationDetails',
+    'locationFilter',
+    'callPhoneNumber',
+    'callCountryCode',
+    'callIsTracked',
+    'callCallOnly',
+    'callConversionTracker',
+    'callConversionTrackerId',
+    'appId',
+    'appStore',
+    'feedItemId',
+    'feedId',
+    'feedType',
+    'accountId',
+    'campaign',
+    'adGroup',
+    'keywordId',
+    'keywordMatchType',
+    'keywordText',
+    'campaignId',
+    'adGroupId',
+    'ad',
+    'adId',
+    'isUnattributedAd',
+    'adHeadline',
+    'adHeadline2',
+    'adHeadline3',
+    'adDescription1',
+    'adDescription2',
+    'adDisplayUrl',
+    'adLandingPage',
+    'adType',
+    'adPromotionLine'
 ]
 AVAILABLE_STREAMS = [
     'account',
@@ -88,55 +135,73 @@ class SearchAdsStream(Stream):
     valid_replication_keys = ['lastModifiedTimestamp']
     replication_key = 'lastModifiedTimestamp'
     data = []
-
+    fields = []
+    filters = []
+    
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
         self.key_properties = [name+'Id']
-        # setting up optional config
-        # date segment is used here as replication key
-        if 'date_segment' in self.config and self.config['date_segment']:
-            schema = self.load_schema()
-            if any([prop for prop in schema['properties'] if prop == self.config['date_segment']]):
-                self.replication_key = self.config['date_segment']
-                self.valid_replication_keys = [self.config['date_segment']]
+        
         # set replicat_method for reports that have specific properties
         if name in SPECIFIC_REPLICATION_KEYS:
             self.replication_key = SPECIFIC_REPLICATION_KEYS[name]
             self.valid_replication_keys = SPECIFIC_REPLICATION_KEYS[name]
 
+        # setting up custom_report if exists
+        if 'custom_report' in self.config and name in self.config['custom_report']:
+            self.set_custom_report(self.config['custom_report'][name])
+
+
+    def set_custom_report(self, custom_report):
+        # set fields
+        if 'columns' in custom_report:
+            self.fields = custom_report['columns']
+        # set filters
+        if 'filters' in custom_report:
+            self.filters = custom_report['filters']
+
+        # set replication key
+        if 'replication_key' in custom_report:
+            schema = self.load_schema()
+            # check if exists
+            if any([prop for prop in schema['properties'] if prop == custom_report['replication_key']]):
+                if 'columns' in custom_report:
+                    if custom_report['replication_key'] not in custom_report['columns']:
+                        raise Exception('Replication key must be in the report field selection. Please check your config file')
+                self.replication_key = custom_report['replication_key']
+                self.valid_replication_keys = [custom_report['replication_key']]
+            else:
+                raise Exception(f"Replication key not found. Please check your config file")
+
+
+
     def selected_properties(self, metadata, fields=None):
         """
             This function does:
-             - return columns to make the request body.
-             - return metadata with the property "selected:false" on segment date that we don't need
-               because we can select only one segment per report.
-
-            if date_segment option is empty "selected:false" property is apply to all segment.
+            - select only the properties in report list selection in config.
+            - if no selection fields "selected:false" property is apply to all segment.
         """
-        mdata, columns, unselect_segment_date = metadata, [], copy(AVAILABLE_SEGMENT_DATE)
-        # check if date segment exists
-        if 'date_segment' in self.config and self.config['date_segment']:
-            if self.config['date_segment'] in AVAILABLE_SEGMENT_DATE:
-                unselect_segment_date.remove(self.config['date_segment'])
-            else:
-                raise SegmentValueError(f"Can not found the segment '{self.config['date_segment']}'. Segment available are {', '.join(AVAILABLE_SEGMENT_DATE)}")
+        mdata, columns, selected_fields = metadata, [], []
         # add selected false to properties we don't want
+        schema = self.load_schema()
+        if fields:
+            selected_fields = fields
+        else:
+            # select all except segments
+            selected_fields = [prop for prop in schema['properties'] if prop not in AVAILABLE_SEGMENT]
+         
         for field in mdata:
             if field['breadcrumb']:
                 columns.append(field['breadcrumb'][1])
-                if field['breadcrumb'][1] in unselect_segment_date or \
-                    fields and field['breadcrumb'][1] not in fields:
+                if field['breadcrumb'][1] not in selected_fields:
                     field['metadata'].update(selected = 'false')
                     columns.pop(-1)
         return columns, mdata
 
-    def write(self):
-        if self.data:
-            self.write_schema()
-            self.sync(self.metadata)
-            self.write_state()
-        else:
-            raise DataIsMissingError(f"Something went wrong can not continue the run")
+    def write(self, metadata):
+        self.write_schema()
+        self.sync(metadata)
+        self.write_state()
 
     def request_body(self, columns, filters=None):
         yesterday = datetime.now() - timedelta(days=1)
@@ -173,15 +238,6 @@ class SearchAdsStream(Stream):
             for f in filters]
         return payloads
 
-    def request_data(self, metadata):
-        fields = None
-        filters = None
-        if 'report_fields' in self.config and self.name in self.config['report_fields']:
-            fields = self.config['report_fields'][self.name]
-        if 'filters' in self.config:
-            filters = self.config['filters']
-        columns, self.metadata = self.selected_properties(metadata, fields=fields)
-        self.data = self.client.get_data(self.request_body(columns, filters=filters))
 
     def get_bookmark(self):
         bookmark = singer.get_bookmark(state=self.state, tap_stream_id=self.name, key=self.replication_key)
@@ -191,18 +247,19 @@ class SearchAdsStream(Stream):
 
     def sync(self, mdata):
         logger.info(f'syncing {self.name}')
+        columns, metadata = self.selected_properties(mdata, fields=self.fields)
+        data = self.client.get_data(self.request_body(columns, filters=self.filters))
         schema = self.load_schema()
-        if self.data:
-            bookmark = self.get_bookmark()
-            new_bookmark = bookmark
-            with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
-                with singer.metrics.record_counter(endpoint=self.name) as counter:
-                    for d in self.data:
-                        with singer.Transformer(integer_datetime_fmt="unix-seconds-integer-datetime-parsing") as transformer:
-                            transformed_record = transformer.transform(data=d, schema=schema, metadata=singer.metadata.to_map(self.metadata))
-                            new_bookmark = max(new_bookmark, transformed_record.get(self.replication_key))
-                            if (self.replication_method == 'INCREMENTAL' and transformed_record.get(self.replication_key) > bookmark) or self.replication_method == 'FULL_TABLE':
-                                singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=transformed_record)
-                                counter.increment()
-            self.state = singer.write_bookmark(state=self.state, tap_stream_id=self.name, key=self.replication_key, val=new_bookmark)
+        bookmark = self.get_bookmark()
+        new_bookmark = bookmark
+        with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
+            with singer.metrics.record_counter(endpoint=self.name) as counter:
+                for d in data:
+                    with singer.Transformer(integer_datetime_fmt="unix-seconds-integer-datetime-parsing") as transformer:
+                        transformed_record = transformer.transform(data=d, schema=schema, metadata=singer.metadata.to_map(metadata))
+                        new_bookmark = max(new_bookmark, transformed_record.get(self.replication_key))
+                        if (self.replication_method == 'INCREMENTAL' and transformed_record.get(self.replication_key) > bookmark) or self.replication_method == 'FULL_TABLE':
+                            singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=transformed_record)
+                            counter.increment()
+        self.state = singer.write_bookmark(state=self.state, tap_stream_id=self.name, key=self.replication_key, val=new_bookmark)
 

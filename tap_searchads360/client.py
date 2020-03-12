@@ -66,7 +66,7 @@ class GoogleSearchAdsClient:
             raise ClientHttp5xxError()
         else:
             message = resp['error']['errors'][0]['message']
-            raise ClientHttpError(f'{response.status_code}: {message}')
+            raise ClientHttpError(f'Status code {response.status_code}: {message}')
         
     @backoff.on_exception(backoff.expo, (ClientTooManyRequestError, ClientExpiredError), max_tries=3)
     def do_request(self, url, **kwargs):
@@ -81,8 +81,7 @@ class GoogleSearchAdsClient:
         
         response = req(url=url, **kwargs)
         logger.info(f'request api: {url}, response status: {response.status_code}')
-        # TODO: why is not returning error when status_code is 400
-        if response.status_code == 200 or 202:
+        if response.status_code == 200 or response.status_code == 202:
             return response
         elif response.status_code == 429:
             raise ClientTooManyRequestError(f'Too many requests, retry ..')
@@ -91,7 +90,6 @@ class GoogleSearchAdsClient:
         else:
             resp = response.json()
             message = resp['error']['errors'][0]['message']
-            logger.info(message)
             raise ClientHttpError(f'{response.status_code}: {message}')
 
     def request_report(self, payloads):
