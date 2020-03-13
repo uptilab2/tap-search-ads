@@ -57,9 +57,11 @@ Tap config.json parameters:
 - engineAccount_id: unique identifier of the account in the external engine account
 - start_date: Inclusive date in YYYY-MM-DD format
 - end_date: Inclusive date in YYYY-MM-DD format (optional: if is not added in config, end_date will be the current day)
-- custom_report: choose your column, replication_key and filters for each type of report (see example below): 
+- custom_report: choose your columns, replication_key and filters for each type of report (see example below): 
     - replication_key: set the replication_key (default:'lastModifiedTimestamp' except for report conversion = 'conversionDate' and visit = 'visitDate').
     - columns: Dict of columns you want to select for each type of report.
+        /!\ WARNING
+        Becareful, all segments fields are not selected by default, please refer to the documentation: https://developers.google.com/search-ads/v2/report-types and choose one segment per report.
     - filters: list of filters you want to use.
 ```
 ...
@@ -84,8 +86,7 @@ Tap config.json parameters:
     }
 ...
 ```
-    /!\ WARNING
-    Becareful, all segments fields are not selected by default, please refer to the documentation: https://developers.google.com/search-ads/v2/report-types and choose one segment per report.
+
 
 
 3. Run the tap in discovery mode to get catalog.json file

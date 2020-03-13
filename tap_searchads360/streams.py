@@ -123,8 +123,11 @@ class Stream:
         schema_path = self.get_abs_path('schemas')
         return singer.utils.load_json('{}/{}.json'.format(schema_path, self.name))
 
-    def write_schema(self):
+    def write_schema(self, columns=None):
         schema = self.load_schema()
+        logger.info(schema)
+        if columns:
+            schema['properties'] = [{prop[0]: prop[1]} for prop in schema['properties'].items() if prop[0] in columns]
         return singer.write_schema(stream_name=self.name, schema=schema, key_properties=self.key_properties)
 
     def write_state(self):
@@ -199,8 +202,9 @@ class SearchAdsStream(Stream):
         return columns, mdata
 
     def write(self, metadata):
-        self.write_schema()
-        self.sync(metadata)
+        columns, metadata = self.selected_properties(metadata, fields=self.fields)
+        self.write_schema(columns)
+        self.sync(columns, metadata)
         self.write_state()
 
     def request_body(self, columns, filters=None):
@@ -245,9 +249,8 @@ class SearchAdsStream(Stream):
             bookmark = self.config.get('start_date')
         return bookmark
 
-    def sync(self, mdata):
+    def sync(self,columns, mdata):
         logger.info(f'syncing {self.name}')
-        columns, metadata = self.selected_properties(mdata, fields=self.fields)
         data = self.client.get_data(self.request_body(columns, filters=self.filters))
         schema = self.load_schema()
         bookmark = self.get_bookmark()
@@ -256,7 +259,7 @@ class SearchAdsStream(Stream):
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 for d in data:
                     with singer.Transformer(integer_datetime_fmt="unix-seconds-integer-datetime-parsing") as transformer:
-                        transformed_record = transformer.transform(data=d, schema=schema, metadata=singer.metadata.to_map(metadata))
+                        transformed_record = transformer.transform(data=d, schema=schema, metadata=singer.metadata.to_map(mdata))
                         new_bookmark = max(new_bookmark, transformed_record.get(self.replication_key))
                         if (self.replication_method == 'INCREMENTAL' and transformed_record.get(self.replication_key) > bookmark) or self.replication_method == 'FULL_TABLE':
                             singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=transformed_record)
