@@ -125,9 +125,9 @@ class Stream:
 
     def write_schema(self, columns=None):
         schema = self.load_schema()
-        logger.info(schema)
         if columns:
-            schema['properties'] = [{prop[0]: prop[1]} for prop in schema['properties'].items() if prop[0] in columns]
+            selected_properties = {prop[0]: prop[1] for prop in schema['properties'].items() if prop[0] in columns}
+            schema['properties'] = selected_properties
         return singer.write_schema(stream_name=self.name, schema=schema, key_properties=self.key_properties)
 
     def write_state(self):
