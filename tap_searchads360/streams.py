@@ -146,9 +146,9 @@ class SearchAdsStream(Stream):
         self.key_properties = [name+'Id']
         
         # setting up custom_report, filters and replication_key
-        if 'custom_report' in config:
+        if 'custom_report' in self.config:
             custom_reports = [custom_report for custom_report in self.config['custom_report'] if name == custom_report['name']]
-        self.set_options(custom_reports[0] if custom_reports else None, self.config)
+        self.set_options(self.config, custom_reports[0] if custom_reports else None)
 
         # set replicat_method for reports that have specific properties and can't be change
         if name in SPECIFIC_REPLICATION_KEYS:
@@ -156,8 +156,7 @@ class SearchAdsStream(Stream):
             self.valid_replication_keys = SPECIFIC_REPLICATION_KEYS[name]
 
 
-
-    def set_options(self, custom_report=None, config):
+    def set_options(self, config, custom_report=None):
         # set fields
         if custom_report and 'columns' in custom_report:
             self.fields = custom_report['columns']
