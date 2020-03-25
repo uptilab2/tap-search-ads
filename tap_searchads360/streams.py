@@ -170,7 +170,7 @@ class SearchAdsStream(Stream):
             schema = self.load_schema()
             # check if exists
             if any([prop for prop in schema['properties'] if prop == config['replication_key']]):
-                if config['replication_key'] not in self.fields:
+                if self.fields and config['replication_key'] not in self.fields:
                     raise Exception('Replication key must be in the report field selection. Please check your config file')
                 self.replication_key = config['replication_key']
                 self.valid_replication_keys = [config['replication_key']]
