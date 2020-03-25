@@ -125,12 +125,9 @@ class Stream:
 
     def write_schema(self, columns=None):
         schema = self.load_schema()
-        logger.info(schema)
         if columns:
             selected_properties = {prop[0]: prop[1] for prop in schema['properties'].items() if prop[0] in columns}
             schema['properties'] = selected_properties
-        logger.info("=========================")
-        logger.info(schema)
         return singer.write_schema(stream_name=self.name, schema=schema, key_properties=self.key_properties)
 
     def write_state(self):
@@ -148,34 +145,36 @@ class SearchAdsStream(Stream):
         super().__init__(name, **kwargs)
         self.key_properties = [name+'Id']
         
-        # set replicat_method for reports that have specific properties
+        # setting up custom_report, filters and replication_key
+        if 'custom_report' in config:
+            custom_reports = [custom_report for custom_report in self.config['custom_report'] if name == custom_report['name']]
+        self.set_options(custom_reports[0] if custom_reports else None, self.config)
+
+        # set replicat_method for reports that have specific properties and can't be change
         if name in SPECIFIC_REPLICATION_KEYS:
             self.replication_key = SPECIFIC_REPLICATION_KEYS[name]
             self.valid_replication_keys = SPECIFIC_REPLICATION_KEYS[name]
 
-        # setting up custom_report if exists
-        if 'custom_report' in self.config and name in self.config['custom_report']:
-            self.set_custom_report(self.config['custom_report'][name])
 
 
-    def set_custom_report(self, custom_report):
+    def set_options(self, custom_report=None, config):
         # set fields
-        if 'columns' in custom_report:
+        if custom_report and 'columns' in custom_report:
             self.fields = custom_report['columns']
+
         # set filters
-        if 'filters' in custom_report:
-            self.filters = custom_report['filters']
+        if 'filters' in config:
+            self.filters = config['filters']
 
         # set replication key
-        if 'replication_key' in custom_report:
+        if 'replication_key' in config:
             schema = self.load_schema()
             # check if exists
-            if any([prop for prop in schema['properties'] if prop == custom_report['replication_key']]):
-                if 'columns' in custom_report:
-                    if custom_report['replication_key'] not in custom_report['columns']:
-                        raise Exception('Replication key must be in the report field selection. Please check your config file')
-                self.replication_key = custom_report['replication_key']
-                self.valid_replication_keys = [custom_report['replication_key']]
+            if any([prop for prop in schema['properties'] if prop == config['replication_key']]):
+                if config['replication_key'] not in self.fields:
+                    raise Exception('Replication key must be in the report field selection. Please check your config file')
+                self.replication_key = config['replication_key']
+                self.valid_replication_keys = [config['replication_key']]
             else:
                 raise Exception(f"Replication key not found. Please check your config file")
 
