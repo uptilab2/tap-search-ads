@@ -175,7 +175,7 @@ class SearchAdsStream(Stream):
                 self.replication_key = config['replication_key']
                 self.valid_replication_keys = [config['replication_key']]
             else:
-                raise Exception(f"Replication key not found. Please check your config file")
+                logger.info(f"Custom replication key not found. default is set: {self.replication_key}")
 
 
 
