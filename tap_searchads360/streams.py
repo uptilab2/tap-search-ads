@@ -157,13 +157,14 @@ class SearchAdsStream(Stream):
 
 
     def set_options(self, config, custom_report=None):
-        # set fields
-        if custom_report and 'columns' in custom_report:
-            self.fields = custom_report['columns']
+        if custom_report:
+            # set fields
+            if 'columns' in custom_report and custom_report['columns']:
+                self.fields = custom_report['columns']
 
-        # set filters
-        if 'filters' in config:
-            self.filters = config['filters']
+            # set filters
+            if 'filters' in custom_report and custom_report['filters']:
+                self.filters = custom_report['filters']
 
         # set replication key
         if 'replication_key' in config:
@@ -192,7 +193,7 @@ class SearchAdsStream(Stream):
             selected_fields = fields
         else:
             # select all except segments
-            selected_fields = [prop for prop in schema['properties'] if prop not in AVAILABLE_SEGMENT]
+            selected_fields = [prop for prop in schema['properties'] if prop not in AVAILABLE_SEGMENT or prop == self.replication_key]
          
         for field in mdata:
             if field['breadcrumb']:
