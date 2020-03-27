@@ -66,7 +66,7 @@ class GoogleSearchAdsClient:
             raise ClientHttp5xxError()
         else:
             message = resp['error']['errors'][0]['message']
-            raise ClientHttpError(f'{response.status_code}: {message}')
+            raise ClientHttpError(f'Status code {response.status_code}: {message}')
         
     @backoff.on_exception(backoff.expo, (ClientTooManyRequestError, ClientExpiredError), max_tries=3)
     def do_request(self, url, **kwargs):
@@ -80,14 +80,15 @@ class GoogleSearchAdsClient:
             kwargs['headers'] = {"Content-Type": "application/json"}
         
         response = req(url=url, **kwargs)
-
-        if response.status_code == 200 or 202:
+        logger.info(f'request api: {url}, response status: {response.status_code}')
+        if response.status_code == 200 or response.status_code == 202:
             return response
         elif response.status_code == 429:
             raise ClientTooManyRequestError(f'Too many requests, retry ..')
         elif response.status_code == 401 and resp['error']['errors'][0]['reason'] == 'expired':
             raise ClientExpiredError(f'Token is expired, retry ..')
         else:
+            resp = response.json()
             message = resp['error']['errors'][0]['message']
             raise ClientHttpError(f'{response.status_code}: {message}')
 
@@ -116,26 +117,32 @@ class GoogleSearchAdsClient:
                 logger.info(f'Report is not ready yet, next request in {POLLING_TIME} sec..')
                 time.sleep(POLLING_TIME)
         logger.info('finished polling..')
-        logger.info(files)
         return files
 
     def get_data(self, request_body):
         report_id = self.request_report(request_body)
         logger.info(f'Requested report: {report_id}')
-        files = self.get_files_link(report_id)
-        logger.info('try to extract files')
-        data = []
-        for file_url in files:
-            d = self.extract_data(file_url.get('url'))
-            data.append(d)
-        df = data[0].append(data[1:])
-        return df.to_dict(orient='records')
-
+        if report_id:
+            files = self.get_files_link(report_id)
+            if files:
+                logger.info('try to extract files')
+                data = []
+                for file_url in files:
+                    d = self.extract_data(file_url.get('url'))
+                    data.append(d)
+                if data:
+                    if len(data) > 0:
+                        [data[0].append(d) for d in data if not d.equals(data[0])]
+                    df = data[0]
+                    return df.to_dict(orient='records')
+                else:
+                    return {}
+            
     def extract_data(self, file_url):
         # To download file we have to set the token on the header
         headers = {'Authorization': 'Bearer '+self.access_token}
-        file_tmp = tempfile.NamedTemporaryFile(dir='/tmp', suffix='.csv', buffering=0)
-        response = self.do_request(file_url, headers=headers, stream=True)
+        file_tmp = tempfile.NamedTemporaryFile(dir='/tmp', suffix='.csv')
+        response = self.do_request(file_url, headers=headers)
         file_tmp.write(response.content)
         file_tmp.seek(0)
         df = pandas.read_csv(file_tmp)

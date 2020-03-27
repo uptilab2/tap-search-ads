@@ -1,12 +1,12 @@
 import json
 import singer
 import sys
-import threading
 from .client import GoogleSearchAdsClient
 from .streams import SearchAdsStream, AVAILABLE_STREAMS
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = singer.get_logger()
-REQUIRED_CONFIG_KEYS = ['client_id', 'client_secret', 'refresh_token', 'start_date', 'end_date', 'agency_id', 'advertiser_id', 'engineAccount_id']
+REQUIRED_CONFIG_KEYS = ['client_id', 'client_secret', 'refresh_token', 'start_date', 'agency_id', 'advertiser_id', 'engineAccount_id']
 
 def get_catalog(streams):
     catalog = {}
@@ -25,24 +25,31 @@ def get_catalog(streams):
         catalog['streams'].append(catalog_entry)
     return catalog
 
-def discover():
+def discover(config=None):
     logger.info('Starting discover ..')
-    streams = [SearchAdsStream(stream_name) for stream_name in AVAILABLE_STREAMS]
+    streams = [SearchAdsStream(stream_name, config=config) for stream_name in AVAILABLE_STREAMS]
     catalog = get_catalog(streams)
     logger.info('Finished discover ..')
     return json.dump(catalog, sys.stdout, indent=2)
 
 def sync(client, config, catalog, state):
     logger.info('Starting Sync..')
-    for catalog_entry in catalog.get_selected_streams(state):
-        stream = SearchAdsStream(name=catalog_entry.stream, client=client, config=config, catalog_stream=catalog_entry.stream, state=state)
-        logger.info('Syncing stream: %s', catalog_entry.stream)
-        # Each stream can be very long in time, because google needs to generate CSV files then we downloads and parse them.
-        thread = threading.Thread(target=stream.write, args=(catalog_entry.metadata,))
-        thread.start()
-    logger.info('Finished Sync..')
+    # request all data first
+    futures = []
+    with ThreadPoolExecutor() as executor:
+        for catalog_entry in catalog.get_selected_streams(state):
+            stream = SearchAdsStream(name=catalog_entry.stream, client=client, config=config, catalog_stream=catalog_entry.stream, state=state)
+            # Each stream can be very long in time, because google needs to generate CSV files then we downloads and parse them.
+            futures.append(executor.submit(stream.write, catalog_entry.metadata))
 
-
+    for routine in as_completed(futures):
+        try:
+            routine.result()
+        except Exception:
+            logger.info('Error in threadpool, can not finish the sync')
+            raise
+    logger.info(f'Finished sync..')
+    
 @singer.utils.handle_top_exception(logger)
 def main():
     args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
@@ -54,7 +61,7 @@ def main():
     
     with client:
         if args.discover:
-            discover()
+            discover(config=args.config)
         else:
             sync(client=client, config=args.config, catalog=args.catalog, state=args.state)
     
