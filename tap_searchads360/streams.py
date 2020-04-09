@@ -227,7 +227,7 @@ class SearchAdsStream(Stream):
                 'endDate': default_end_date
             },
             'downloadFormat': 'CSV',
-            'maxRowsPerFile': 1000000, # min rows value
+            'maxRowsPerFile': 100000000, # max rows value
             'statisticsCurrency': 'agency'
         }
         if 'end_date' in self.config:
@@ -254,18 +254,19 @@ class SearchAdsStream(Stream):
 
     def sync(self,columns, mdata):
         logger.info(f'syncing {self.name}')
-        data = self.client.get_data(self.request_body(columns, filters=self.filters))
+        data_files = self.client.get_data(self.request_body(columns, filters=self.filters))
         schema = self.load_schema()
         bookmark = self.get_bookmark()
         new_bookmark = bookmark
         with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
             with singer.metrics.record_counter(endpoint=self.name) as counter:
-                for d in data:
-                    with singer.Transformer() as transformer:
-                        transformed_record = transformer.transform(data=d, schema=schema, metadata=singer.metadata.to_map(mdata))
-                        new_bookmark = max(new_bookmark, transformed_record.get(self.replication_key))
-                        if (self.replication_method == 'INCREMENTAL' and transformed_record.get(self.replication_key) > bookmark) or self.replication_method == 'FULL_TABLE':
-                            singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=transformed_record)
-                            counter.increment()
+                for data_file in data_files:
+                    for line in data_file:
+                        with singer.Transformer() as transformer:
+                            transformed_record = transformer.transform(data=line, schema=schema, metadata=singer.metadata.to_map(mdata))
+                            new_bookmark = max(new_bookmark, transformed_record.get(self.replication_key))
+                            if (self.replication_method == 'INCREMENTAL' and transformed_record.get(self.replication_key) > bookmark) or self.replication_method == 'FULL_TABLE':
+                                singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=transformed_record)
+                                counter.increment()
         self.state = singer.write_bookmark(state=self.state, tap_stream_id=self.name, key=self.replication_key, val=new_bookmark)
 

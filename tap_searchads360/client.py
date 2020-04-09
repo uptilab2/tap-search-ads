@@ -129,15 +129,17 @@ class GoogleSearchAdsClient:
                 logger.info('try to extract files')
                 data = []
                 for file_url in files:
-                    d = self.extract_data(file_url.get('url'))
-                    data.extend(d)
+                    data = self.extract_data(file_url.get('url'))
+                    for df in data: 
+                        df = df.where(pandas.notnull(df), None)
+                        yield df.to_dict(orient='records')
                     # if d:
                         # yield d
                 #     data.append(d)
-                if data:
-                    return data
-                else:
-                    return []
+                # if data:
+                #     return data
+                # else:
+                #     return []
                 #     df = pandas.concat(data)
                 #     return df.to_dict(orient='records')
                 # else:
@@ -147,7 +149,6 @@ class GoogleSearchAdsClient:
         # To download file we have to set the token on the header
         headers = {'Authorization': 'Bearer '+self.access_token}
         response = self.do_request(file_url, headers=headers)
-        df = pandas.read_csv(io.StringIO(response.content.decode('utf-8')))
-        df = df.where(pandas.notnull(df), None)
-        return df.to_dict(orient='records')
+        df = pandas.read_csv(io.StringIO(response.content.decode('utf-8')), chunksize=10000)
+        return df
         
