@@ -5,6 +5,7 @@ import tempfile
 import pandas
 import json
 import backoff
+import io
 from datetime import datetime, timedelta
 
 logger = singer.get_logger()
@@ -131,9 +132,7 @@ class GoogleSearchAdsClient:
                     d = self.extract_data(file_url.get('url'))
                     data.append(d)
                 if data:
-                    if len(data) > 0:
-                        [data[0].append(d) for d in data if not d.equals(data[0])]
-                    df = data[0]
+                    df = pandas.concat(data)
                     return df.to_dict(orient='records')
                 else:
                     return {}
@@ -141,11 +140,8 @@ class GoogleSearchAdsClient:
     def extract_data(self, file_url):
         # To download file we have to set the token on the header
         headers = {'Authorization': 'Bearer '+self.access_token}
-        file_tmp = tempfile.NamedTemporaryFile(dir='/tmp', suffix='.csv')
         response = self.do_request(file_url, headers=headers)
-        file_tmp.write(response.content)
-        file_tmp.seek(0)
-        df = pandas.read_csv(file_tmp)
+        df = pandas.read_csv(io.StringIO(response.content.decode('utf-8')))
         df = df.where(pandas.notnull(df), None)
         return df
         

@@ -242,6 +242,7 @@ class SearchAdsStream(Stream):
                 "values": [f['value']],
             }
             for f in filters]
+        logger.info(payloads)
         return payloads
 
 
@@ -260,7 +261,7 @@ class SearchAdsStream(Stream):
         with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 for d in data:
-                    with singer.Transformer(integer_datetime_fmt="unix-seconds-integer-datetime-parsing") as transformer:
+                    with singer.Transformer() as transformer:
                         transformed_record = transformer.transform(data=d, schema=schema, metadata=singer.metadata.to_map(mdata))
                         new_bookmark = max(new_bookmark, transformed_record.get(self.replication_key))
                         if (self.replication_method == 'INCREMENTAL' and transformed_record.get(self.replication_key) > bookmark) or self.replication_method == 'FULL_TABLE':
