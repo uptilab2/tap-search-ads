@@ -2,7 +2,7 @@ import singer
 import requests
 import time
 import tempfile
-import pandas
+import csv
 import json
 import backoff
 import io
@@ -130,25 +130,11 @@ class GoogleSearchAdsClient:
                 data = []
                 for file_url in files:
                     data = self.extract_data(file_url.get('url'))
-                    for df in data: 
-                        df = df.where(pandas.notnull(df), None)
-                        yield df.to_dict(orient='records')
-                    # if d:
-                        # yield d
-                #     data.append(d)
-                # if data:
-                #     return data
-                # else:
-                #     return []
-                #     df = pandas.concat(data)
-                #     return df.to_dict(orient='records')
-                # else:
-                    # yield {}
+                    yield data
             
     def extract_data(self, file_url):
         # To download file we have to set the token on the header
         headers = {'Authorization': 'Bearer '+self.access_token}
         response = self.do_request(file_url, headers=headers)
-        df = pandas.read_csv(io.StringIO(response.content.decode('utf-8')), chunksize=10000)
-        return df
+        return csv.DictReader(io.StringIO(response.content.decode()))
         
