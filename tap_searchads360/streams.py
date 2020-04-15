@@ -209,11 +209,7 @@ class SearchAdsStream(Stream):
         self.sync(columns, metadata)
         self.write_state()
 
-    def request_body(self, columns, filters=None):
-        yesterday = datetime.now() - timedelta(days=1)
-        default_end_date = yesterday.strftime('%Y-%m-%d')
-        if self.config['start_date'][:10] > str(yesterday) and 'end_date' not in self.config:
-            raise DateRangeError(f"start_date should be at least 1 days ago")
+    def request_body(self, columns, start_date, end_date, filters=None):
 
         payloads = {
             'reportScope':{
@@ -223,11 +219,11 @@ class SearchAdsStream(Stream):
             'reportType': self.name,
             'columns': [{'columnName': column_name} for column_name in columns],
             'timeRange': {
-                'startDate': self.config['start_date'][:10],
-                'endDate': default_end_date
+                'startDate': start_date,
+                'endDate': end_date
             },
             'downloadFormat': 'CSV',
-            'maxRowsPerFile': 100000000, # max rows value
+            'maxRowsPerFile': 1000000, # min rows value
             'statisticsCurrency': 'agency'
         }
         if 'end_date' in self.config:
@@ -242,7 +238,6 @@ class SearchAdsStream(Stream):
                 "values": [f['value']],
             }
             for f in filters]
-        logger.info(payloads)
         return payloads
 
 
@@ -252,18 +247,31 @@ class SearchAdsStream(Stream):
             bookmark = self.config.get('start_date')
         return bookmark
 
-    def sync(self,columns, mdata):
+    def sync(self, columns, mdata):
         logger.info(f'syncing {self.name}')
-        data_files = self.client.get_data(self.request_body(columns, filters=self.filters))
+        
         schema = self.load_schema()
         bookmark = self.get_bookmark()
         new_bookmark = bookmark
-        with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
-            with singer.metrics.record_counter(endpoint=self.name) as counter:
-                for data_file in data_files:
-                    for line in data_file:
+
+        #check start_date
+        yesterday = datetime.now() - timedelta(days=1)
+        default_end_date = yesterday.strftime('%Y-%m-%d')
+        if bookmark[:10] > str(yesterday):
+            raise DateRangeError(f"start_date should be at least 1 days ago")
+        
+        # request data with the right date, if there is a bookmark value use it, request less data
+        files = self.client.get_files(self.request_body(columns, bookmark[:10], default_end_date, filters=self.filters))
+        for file in files:
+            data = self.client.extract_data(file.get('url'))
+            logger.info(f'Writing records for {self.name} from file : '+file.get('url'))
+            with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
+                with singer.metrics.record_counter(endpoint=self.name) as counter:
+                    for line in data:
+                        dict = {key: value for (key, value) in line.items()}
+                        logger.info(dict)
                         with singer.Transformer() as transformer:
-                            transformed_record = transformer.transform(data=line, schema=schema, metadata=singer.metadata.to_map(mdata))
+                            transformed_record = transformer.transform(data=dict, schema=schema, metadata=singer.metadata.to_map(mdata))
                             new_bookmark = max(new_bookmark, transformed_record.get(self.replication_key))
                             if (self.replication_method == 'INCREMENTAL' and transformed_record.get(self.replication_key) > bookmark) or self.replication_method == 'FULL_TABLE':
                                 singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=transformed_record)

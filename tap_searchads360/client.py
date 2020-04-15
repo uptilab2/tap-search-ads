@@ -120,21 +120,14 @@ class GoogleSearchAdsClient:
         logger.info('finished polling..')
         return files
 
-    def get_data(self, request_body):
+    def get_files(self, request_body):
         report_id = self.request_report(request_body)
         logger.info(f'Requested report: {report_id}')
         if report_id:
-            files = self.get_files_link(report_id)
-            if files:
-                logger.info('try to extract files')
-                data = []
-                for file_url in files:
-                    data = self.extract_data(file_url.get('url'))
-                    yield data
+            return self.get_files_link(report_id)
             
     def extract_data(self, file_url):
         # To download file we have to set the token on the header
         headers = {'Authorization': 'Bearer '+self.access_token}
         response = self.do_request(file_url, headers=headers)
         return csv.DictReader(io.StringIO(response.content.decode()))
-        
