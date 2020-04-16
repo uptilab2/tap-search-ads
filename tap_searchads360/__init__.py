@@ -35,19 +35,20 @@ def discover(config=None):
 def sync(client, config, catalog, state):
     logger.info('Starting Sync..')
     # request all data first
-    futures = []
-    with ThreadPoolExecutor() as executor:
-        for catalog_entry in catalog.get_selected_streams(state):
-            stream = SearchAdsStream(name=catalog_entry.stream, client=client, config=config, catalog_stream=catalog_entry.stream, state=state)
+    # futures = []
+    # with ThreadPoolExecutor() as executor:
+    for catalog_entry in catalog.get_selected_streams(state):
+        stream = SearchAdsStream(name=catalog_entry.stream, client=client, config=config, catalog_stream=catalog_entry.stream, state=state)
+        stream.write(catalog_entry.metadata)
             # Each stream can be very long in time, because google needs to generate CSV files then we downloads and parse them.
-            futures.append(executor.submit(stream.write, catalog_entry.metadata))
+            # futures.append(executor.submit(stream.write, catalog_entry.metadata))
 
-    for routine in as_completed(futures):
-        try:
-            routine.result()
-        except Exception:
-            logger.info('Error in threadpool, can not finish the sync')
-            raise
+    # for routine in as_completed(futures):
+    #     try:
+    #         routine.result()
+    #     except Exception:
+    #         logger.info('Error in threadpool, can not finish the sync')
+    #         raise
     logger.info(f'Finished sync..')
     
 @singer.utils.handle_top_exception(logger)
