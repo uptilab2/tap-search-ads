@@ -120,11 +120,17 @@ class GoogleSearchAdsClient:
         logger.info('finished polling..')
         return files
 
-    def get_files(self, request_body):
-        report_id = self.request_report(request_body)
-        logger.info(f'Requested report: {report_id}')
+    def get_report_files(self, request_body=None, saved_report_id=None):
+        if request_body:
+            report_id = self.request_report(request_body)
+            logger.info(f'Requested report: {report_id}')
+        elif saved_report_id:
+            report_id = saved_report_id
+            logger.info(f'Saved report: {report_id}')
+        else:
+            raise Exception(f"Can not get files: report_id not found")
         if report_id:
-            return self.get_files_link(report_id)
+            return report_id, self.get_files_link(report_id)
             
     def extract_data(self, file_url):
         # To download file we have to set the token on the header

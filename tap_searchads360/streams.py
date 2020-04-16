@@ -207,7 +207,6 @@ class SearchAdsStream(Stream):
         columns, metadata = self.selected_properties(metadata, fields=self.fields)
         self.write_schema(columns)
         self.sync(columns, metadata)
-        self.write_state()
 
     def request_body(self, columns, start_date, end_date, filters=None):
 
@@ -242,9 +241,9 @@ class SearchAdsStream(Stream):
 
 
     def get_bookmark(self):
-        bookmark = singer.get_bookmark(state=self.state, tap_stream_id=self.name, key=self.replication_key)
-        if bookmark is None:
-            bookmark = self.config.get('start_date')
+        bookmark = self.state.get('bookmarks', {}).get(self.name, {})
+        if not bookmark:
+            bookmark['date'] = self.config.get('start_date')
         return bookmark
 
     def sync(self, columns, mdata):
@@ -252,29 +251,42 @@ class SearchAdsStream(Stream):
         
         schema = self.load_schema()
         bookmark = self.get_bookmark()
-        new_bookmark = bookmark
 
         #check start_date
         yesterday = datetime.now() - timedelta(days=1)
         default_end_date = yesterday.strftime('%Y-%m-%d')
-        if bookmark[:10] > str(yesterday):
+        if bookmark['date'][:10] > str(yesterday):
             raise DateRangeError(f"start_date should be at least 1 days ago")
         
-        # request data with the right date, if there is a bookmark value use it, request less data
-        files = self.client.get_files(self.request_body(columns, bookmark[:10], default_end_date, filters=self.filters))
-        for file in files:
+        # bookmark report_id, if something wrong happen use it to get files again
+        if not bookmark.get('report_id', None) or bookmark['date'][:10] < str(yesterday):
+            report_id, files = self.client.get_report_files(self.request_body(columns, bookmark['date'][:10], default_end_date, filters=self.filters))
+            bookmark.update({
+                        'report_id': report_id,
+                        'file_count': len(files),
+                        'offset': 0
+                    })
+        else:
+            _, files = self.client.get_report_files(bookmark.get('report_id'))
+
+        new_bookmark = bookmark
+        for count, file in enumerate(files):
+            if bookmark['offset'] > count:
+                continue
+                
             data = self.client.extract_data(file.get('url'))
             logger.info(f'Writing records for {self.name} from file : '+file.get('url'))
             with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
                 with singer.metrics.record_counter(endpoint=self.name) as counter:
                     for line in data:
                         dict = {key: value for (key, value) in line.items()}
-                        logger.info(dict)
                         with singer.Transformer() as transformer:
                             transformed_record = transformer.transform(data=dict, schema=schema, metadata=singer.metadata.to_map(mdata))
-                            new_bookmark = max(new_bookmark, transformed_record.get(self.replication_key))
-                            if (self.replication_method == 'INCREMENTAL' and transformed_record.get(self.replication_key) > bookmark) or self.replication_method == 'FULL_TABLE':
+                            new_bookmark['date'] = max(new_bookmark['date'], transformed_record.get(self.replication_key))
+                            if (self.replication_method == 'INCREMENTAL' and transformed_record.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
                                 singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=transformed_record)
                                 counter.increment()
-        self.state = singer.write_bookmark(state=self.state, tap_stream_id=self.name, key=self.replication_key, val=new_bookmark)
-
+            new_bookmark['offset'] += 1
+        self.state["bookmarks"] = {self.name: new_bookmark}
+        logger.info(self.state)
+        self.write_state()
