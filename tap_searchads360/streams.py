@@ -280,12 +280,10 @@ class SearchAdsStream(Stream):
                 with singer.metrics.record_counter(endpoint=self.name) as counter:
                     for line in data:
                         dict = {key: value for (key, value) in line.items()}
-                        with singer.Transformer() as transformer:
-                            transformed_record = transformer.transform(data=dict, schema=schema, metadata=singer.metadata.to_map(mdata))
-                            new_bookmark['date'] = max(new_bookmark['date'], transformed_record.get(self.replication_key))
-                            if (self.replication_method == 'INCREMENTAL' and transformed_record.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
-                                singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=transformed_record)
-                                counter.increment()
+                        new_bookmark['date'] = max(new_bookmark['date'], dict.get(self.replication_key))
+                        if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
+                            singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
+                            counter.increment()
             new_bookmark['offset'] += 1
         self.state["bookmarks"] = {self.name: new_bookmark}
         logger.info(self.state)
