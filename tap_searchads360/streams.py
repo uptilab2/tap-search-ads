@@ -278,8 +278,11 @@ class SearchAdsStream(Stream):
             logger.info(f'Writing records for {self.name} from file : '+file.get('url'))
             with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
                 with singer.metrics.record_counter(endpoint=self.name) as counter:
-                    for line in data:
-                        dict = {key: value for (key, value) in line.items()}
+                    for line_count, line in enumerate(data):
+                        if line_count == 0:
+                            # remove first line
+                            continue
+                        dict = {key: value for (key, value) in zip(columns, line)}
                         new_bookmark['date'] = max(new_bookmark['date'], dict.get(self.replication_key))
                         if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
                             singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
