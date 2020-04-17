@@ -93,6 +93,14 @@ AVAILABLE_STREAMS = [
     'visit'
 ]
 
+# helpers
+def converting_float(value):
+    try:
+        return float(value)
+    except:
+        return str(value)
+
+
 class DateRangeError(Exception):
     pass
 
@@ -282,7 +290,7 @@ class SearchAdsStream(Stream):
                         if line_count == 0:
                             # remove first line
                             continue
-                        dict = {key: value for (key, value) in zip(columns, line)}
+                        dict = {key: (converting_float(value) if value else None) for (key, value) in zip(columns, line)}
                         new_bookmark['date'] = max(new_bookmark['date'], dict.get(self.replication_key))
                         if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
                             singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
@@ -291,3 +299,4 @@ class SearchAdsStream(Stream):
         self.state["bookmarks"] = {self.name: new_bookmark}
         logger.info(self.state)
         self.write_state()
+
