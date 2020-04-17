@@ -6,7 +6,7 @@ from .streams import SearchAdsStream, AVAILABLE_STREAMS
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = singer.get_logger()
-REQUIRED_CONFIG_KEYS = ['client_id', 'client_secret', 'refresh_token', 'start_date', 'agency_id', 'advertiser_id', 'engineAccount_id']
+REQUIRED_CONFIG_KEYS = ['client_id', 'client_secret', 'refresh_token', 'start_date', 'agency_id']
 
 def get_catalog(streams):
     catalog = {}
@@ -39,6 +39,7 @@ def sync(client, config, catalog, state):
     with ThreadPoolExecutor() as executor:
         for catalog_entry in catalog.get_selected_streams(state):
             stream = SearchAdsStream(name=catalog_entry.stream, client=client, config=config, catalog_stream=catalog_entry.stream, state=state)
+            # stream.write(catalog_entry.metadata)
             # Each stream can be very long in time, because google needs to generate CSV files then we downloads and parse them.
             futures.append(executor.submit(stream.write, catalog_entry.metadata))
 
