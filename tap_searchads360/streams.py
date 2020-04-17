@@ -1,6 +1,8 @@
 import os
 import singer
 from copy import copy
+import hashlib
+import json
 from datetime import datetime, timedelta
 
 logger = singer.get_logger()
@@ -167,7 +169,7 @@ class SearchAdsStream(Stream):
         if 'full_table_replication' in self.config and self.config['full_table_replication']:
             self.replication_method = 'FULL_TABLE'
             self.forced_replication_method = 'FULL_TABLE'
-        logger.info(self.replication_method)
+
         # setting up custom_report, filters and replication_key
         if 'custom_report' in self.config:
             custom_reports = [custom_report for custom_report in self.config['custom_report'] if name == custom_report['name']]
@@ -266,6 +268,7 @@ class SearchAdsStream(Stream):
 
 
     def get_bookmark(self):
+
         bookmark = self.state.get('bookmarks', {}).get(self.name, {})
         if not bookmark:
             bookmark['date'] = self.config.get('start_date')
@@ -276,24 +279,37 @@ class SearchAdsStream(Stream):
         
         schema = self.load_schema()
         bookmark = self.get_bookmark()
+        report_id = ''
+        files = []
 
         #check start_date
         yesterday = datetime.now() - timedelta(days=1)
         default_end_date = yesterday.strftime('%Y-%m-%d')
         if bookmark['date'][:10] > str(yesterday):
             raise DateRangeError(f"start_date should be at least 1 days ago")
-        
-        # bookmark report_id, if something wrong happen use it to get files again
-        if not bookmark.get('report_id', None) or bookmark['date'][:10] < str(yesterday):
-            report_id, files = self.client.get_report_files(self.request_body(columns, bookmark['date'][:10], default_end_date, filters=self.filters))
-            bookmark.update({
-                        'report_id': report_id,
-                        'file_count': len(files),
-                        'offset': 0
-                    })
-        else:
-            _, files = self.client.get_report_files(bookmark.get('report_id'))
 
+        request_body = self.request_body(columns, bookmark['date'][:10], default_end_date, filters=self.filters)
+        
+        extract_id = hashlib.md5(json.dumps(request_body).encode("utf-8")).hexdigest()
+        # bookmark report_id, if something wrong happen use it to get files again, extract_id is to verify if its the same request
+        if bookmark.get('report_id', None)\
+        and bookmark.get('offset') != bookmark.get('file_count')\
+        and bookmark['extract_date'][:10] == str(datetime.now())[:10]\
+        and bookmark['extract_id'] == extract_id:
+            report_id, files = self.client.get_report_files(saved_report_id=bookmark.get('report_id'))
+
+        if not report_id and not files:
+            report_id, files = self.client.get_report_files(request_body)
+
+        logger.info(f'Report {report_id} contain {len(files)} files')
+        bookmark.update({
+            'report_id': report_id,
+            'file_count': len(files),
+            'offset': 0,
+            'extract_date': str(datetime.now())[:10],
+            'extract_id': extract_id
+        })
+           
         new_bookmark = bookmark
         for count, file in enumerate(files):
             if bookmark['offset'] > count:
