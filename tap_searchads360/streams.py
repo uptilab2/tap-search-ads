@@ -96,13 +96,16 @@ AVAILABLE_STREAMS = [
 # helpers
 def converting_value(value, type):
     try:
-        if type == 'string':
+        if 'format' in type:
+            if type['format'] == 'date-time':
+                return datetime.strptime(value, '%Y-%m-%d').strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        if type['type'][1] == 'string':
             return str(value)
-        elif type == 'boolean':
+        elif type['type'][1] == 'boolean':
             return bool(value)
-        elif type == 'number':
+        elif type['type'][1] == 'number':
             return float(value)
-        elif type == 'integer':
+        elif type['type'][1] == 'integer':
             return int(value)
     except:
         return str(value)
@@ -297,7 +300,7 @@ class SearchAdsStream(Stream):
                         if line_count == 0:
                             # remove first line
                             continue
-                        dict = {key: (converting_value(value, schema['properties'][key]['type'][1]) if value else None) for (key, value) in zip(columns, line)}
+                        dict = {key: (converting_value(value, schema['properties'][key]) if value else None) for (key, value) in zip(columns, line)}
                         new_bookmark['date'] = max(new_bookmark['date'], dict.get(self.replication_key))
                         if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
                             singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
