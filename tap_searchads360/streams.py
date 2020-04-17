@@ -162,7 +162,12 @@ class SearchAdsStream(Stream):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
         self.key_properties = [name+'Id']
-        
+
+        # set replication_method
+        if 'full_table_replication' in self.config and self.config['full_table_replication']:
+            self.replication_method = 'FULL_TABLE'
+            self.forced_replication_method = 'FULL_TABLE'
+        logger.info(self.replication_method)
         # setting up custom_report, filters and replication_key
         if 'custom_report' in self.config:
             custom_reports = [custom_report for custom_report in self.config['custom_report'] if name == custom_report['name']]
@@ -231,7 +236,6 @@ class SearchAdsStream(Stream):
         payloads = {
             'reportScope':{
                 'agencyId': self.config['agency_id'],
-                'advertiserId': self.config['advertiser_id']
             },
             'reportType': self.name,
             'columns': [{'columnName': column_name} for column_name in columns],
@@ -247,7 +251,10 @@ class SearchAdsStream(Stream):
             payloads['timeRange']['endDate'] = self.config['end_date'][:10]
         # advertiser report is the only one who don't need engineAccount_id
         if self.name != 'advertiser':
-            payloads['reportScope']['engineAccountId']: self.config['engineAccount_id']
+            if 'engineAccount_id' in self.config:
+                payloads['reportScope']['engineAccountId'] = self.config['engineAccount_id']
+            if 'advertiser_id' in self.config:
+                payloads['reportScope']['advertiserId'] = self.config['advertiser_id']
         if filters:
             payloads['filters'] = [{
                 "column": {"columnName" : f['field']},
@@ -307,6 +314,5 @@ class SearchAdsStream(Stream):
                             counter.increment()
             new_bookmark['offset'] += 1
         self.state["bookmarks"] = {self.name: new_bookmark}
-        logger.info(self.state)
         self.write_state()
 

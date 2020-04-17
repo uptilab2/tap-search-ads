@@ -6,7 +6,7 @@ from .streams import SearchAdsStream, AVAILABLE_STREAMS
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = singer.get_logger()
-REQUIRED_CONFIG_KEYS = ['client_id', 'client_secret', 'refresh_token', 'start_date', 'agency_id', 'advertiser_id', 'engineAccount_id']
+REQUIRED_CONFIG_KEYS = ['client_id', 'client_secret', 'refresh_token', 'start_date', 'agency_id']
 
 def get_catalog(streams):
     catalog = {}

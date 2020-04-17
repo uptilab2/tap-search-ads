@@ -57,6 +57,7 @@ Tap config.json parameters:
 - engineAccount_id: unique identifier of the account in the external engine account
 - start_date: Inclusive date in YYYY-MM-DD format
 - replication_key: set the replication_key (default:'lastModifiedTimestamp' except for report conversion = 'conversionDate' and visit = 'visitDate').
+- full_table_replication: change replication_method to FULL TABLE (default: False)
 
 - custom_report: choose your columns for each type of report (see example below): 
     - name: The report name.
