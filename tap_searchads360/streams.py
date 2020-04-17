@@ -94,9 +94,16 @@ AVAILABLE_STREAMS = [
 ]
 
 # helpers
-def converting_float(value):
+def converting_value(value, type):
     try:
-        return float(value)
+        if type == 'string':
+            return str(value)
+        elif type == 'boolean':
+            return bool(value)
+        elif type == 'number':
+            return float(value)
+        elif type == 'integer':
+            return int(value)
     except:
         return str(value)
 
@@ -290,7 +297,7 @@ class SearchAdsStream(Stream):
                         if line_count == 0:
                             # remove first line
                             continue
-                        dict = {key: (converting_float(value) if value else None) for (key, value) in zip(columns, line)}
+                        dict = {key: (converting_value(value, schema['properties'][key]['type'][1]) if value else None) for (key, value) in zip(columns, line)}
                         new_bookmark['date'] = max(new_bookmark['date'], dict.get(self.replication_key))
                         if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
                             singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
