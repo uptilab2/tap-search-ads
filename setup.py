@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='tap-searchads360',
-    version='0.0.1',
+    version='0.0.2',
     description='Singer.io tap for extracting data from google search ads API',
     author='Reeport',
     classifiers=['Programming Language :: Python :: 3 :: Only'],
