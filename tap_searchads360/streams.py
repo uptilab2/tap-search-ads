@@ -180,11 +180,6 @@ class SearchAdsStream(Stream):
         if name in SPECIFIC_REPLICATION_KEYS:
             self.replication_key = SPECIFIC_REPLICATION_KEYS[name]
             self.valid_replication_keys = SPECIFIC_REPLICATION_KEYS[name]
-        
-        if 'advertiser_ids' in self.config and self.config['advertiser_ids']:
-            self.advertisers = self.config['advertiser_ids']
-        else:
-            self.advertisers = [self.config['advertiser_id']]
 
     def set_options(self, config, custom_report=None):
         if custom_report:
@@ -207,8 +202,6 @@ class SearchAdsStream(Stream):
                 self.valid_replication_keys = [config['replication_key']]
             else:
                 logger.info(f"Custom replication key not found. default is set: {self.replication_key}")
-
-
 
     def selected_properties(self, metadata, fields=None):
         """
@@ -239,7 +232,6 @@ class SearchAdsStream(Stream):
         self.sync(columns, metadata)
 
     def request_body(self, agency_id, advertiser_id, columns, start_date, end_date, filters=None):
-
         payloads = {
             'reportScope':{
                 'agencyId': agency_id,
@@ -281,7 +273,8 @@ class SearchAdsStream(Stream):
     def sync(self, columns, mdata):
         logger.info(f'syncing {self.name}')
         schema = self.load_schema()
-        for advertiser_id in self.advertisers:
+        advertiser_ids = self.config['advertiser_id'] if  isinstance(self.config['advertiser_id'], list) else [self.config['advertiser_id']]
+        for advertiser_id in advertiser_ids:
             bookmark = self.get_bookmark(advertiser_id)
             report_id = ''
             files = []
