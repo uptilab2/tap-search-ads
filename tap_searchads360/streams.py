@@ -160,7 +160,8 @@ class SearchAdsStream(Stream):
     data = []
     fields = []
     filters = []
-    
+    advertisers = []
+
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
         self.key_properties = [name+'Id']
@@ -179,7 +180,6 @@ class SearchAdsStream(Stream):
         if name in SPECIFIC_REPLICATION_KEYS:
             self.replication_key = SPECIFIC_REPLICATION_KEYS[name]
             self.valid_replication_keys = SPECIFIC_REPLICATION_KEYS[name]
-
 
     def set_options(self, config, custom_report=None):
         if custom_report:
@@ -202,8 +202,6 @@ class SearchAdsStream(Stream):
                 self.valid_replication_keys = [config['replication_key']]
             else:
                 logger.info(f"Custom replication key not found. default is set: {self.replication_key}")
-
-
 
     def selected_properties(self, metadata, fields=None):
         """
@@ -233,11 +231,10 @@ class SearchAdsStream(Stream):
         self.write_schema(columns)
         self.sync(columns, metadata)
 
-    def request_body(self, columns, start_date, end_date, filters=None):
-
+    def request_body(self, agency_id, advertiser_id, columns, start_date, end_date, filters=None):
         payloads = {
             'reportScope':{
-                'agencyId': self.config['agency_id'],
+                'agencyId': agency_id,
             },
             'reportType': self.name,
             'columns': [{'columnName': column_name} for column_name in columns],
@@ -253,10 +250,10 @@ class SearchAdsStream(Stream):
             payloads['timeRange']['endDate'] = self.config['end_date'][:10]
         # advertiser report is the only one who don't need engineAccount_id
         if self.name != 'advertiser':
-            if 'engineAccount_id' in self.config:
-                payloads['reportScope']['engineAccountId'] = self.config['engineAccount_id']
+            # if 'engineAccount_id' in self.config:
+            #     payloads['reportScope']['engineAccountId'] = self.config['engineAccount_id']
             if 'advertiser_id' in self.config:
-                payloads['reportScope']['advertiserId'] = self.config['advertiser_id']
+                payloads['reportScope']['advertiserId'] = advertiser_id
         if filters:
             payloads['filters'] = [{
                 "column": {"columnName" : f['field']},
@@ -267,68 +264,67 @@ class SearchAdsStream(Stream):
         return payloads
 
 
-    def get_bookmark(self):
-
-        bookmark = self.state.get('bookmarks', {}).get(self.name, {})
+    def get_bookmark(self, advertiser_id):
+        bookmark = self.state.get('bookmarks', {}).get(self.name, {}).get(advertiser_id, {})
         if not bookmark:
             bookmark['date'] = self.config.get('start_date')
         return bookmark
 
     def sync(self, columns, mdata):
         logger.info(f'syncing {self.name}')
-        
         schema = self.load_schema()
-        bookmark = self.get_bookmark()
-        report_id = ''
-        files = []
+        advertiser_ids = self.config['advertiser_id'] if  isinstance(self.config['advertiser_id'], list) else [self.config['advertiser_id']]
+        for advertiser_id in advertiser_ids:
+            bookmark = self.get_bookmark(advertiser_id)
+            report_id = ''
+            files = []
+            #check start_date
+            yesterday = datetime.now() - timedelta(days=1)
+            default_end_date = yesterday.strftime('%Y-%m-%d')
+            if bookmark['date'][:10] > str(yesterday):
+                raise DateRangeError(f"start_date should be at least 1 days ago")
 
-        #check start_date
-        yesterday = datetime.now() - timedelta(days=1)
-        default_end_date = yesterday.strftime('%Y-%m-%d')
-        if bookmark['date'][:10] > str(yesterday):
-            raise DateRangeError(f"start_date should be at least 1 days ago")
+            request_body = self.request_body(self.config['agency_id'], advertiser_id, columns, bookmark['date'][:10], default_end_date, filters=self.filters)
+            
+            extract_id = hashlib.md5(json.dumps(request_body).encode("utf-8")).hexdigest()
+            # bookmark report_id, if something wrong happen use it to get files again, extract_id is to verify if its the same request
+            if bookmark.get('report_id', None)\
+            and bookmark.get('offset') != bookmark.get('file_count')\
+            and bookmark['extract_date'][:10] == str(datetime.now())[:10]\
+            and bookmark['extract_id'] == extract_id:
+                report_id, files = self.client.get_report_files(saved_report_id=bookmark.get('report_id'))
 
-        request_body = self.request_body(columns, bookmark['date'][:10], default_end_date, filters=self.filters)
-        
-        extract_id = hashlib.md5(json.dumps(request_body).encode("utf-8")).hexdigest()
-        # bookmark report_id, if something wrong happen use it to get files again, extract_id is to verify if its the same request
-        if bookmark.get('report_id', None)\
-        and bookmark.get('offset') != bookmark.get('file_count')\
-        and bookmark['extract_date'][:10] == str(datetime.now())[:10]\
-        and bookmark['extract_id'] == extract_id:
-            report_id, files = self.client.get_report_files(saved_report_id=bookmark.get('report_id'))
+            if not report_id and not files:
+                report_id, files = self.client.get_report_files(request_body)
 
-        if not report_id and not files:
-            report_id, files = self.client.get_report_files(request_body)
-
-        logger.info(f'Report {report_id} contain {len(files)} files')
-        bookmark.update({
-            'report_id': report_id,
-            'file_count': len(files),
-            'offset': 0,
-            'extract_date': str(datetime.now())[:10],
-            'extract_id': extract_id
-        })
-           
-        new_bookmark = bookmark
-        for count, file in enumerate(files):
-            if bookmark['offset'] > count:
-                continue
-                
-            data = self.client.extract_data(file.get('url'))
-            logger.info(f'Writing records for {self.name} from file : '+file.get('url'))
-            with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
-                with singer.metrics.record_counter(endpoint=self.name) as counter:
-                    for line_count, line in enumerate(data):
-                        if line_count == 0:
-                            # remove first line
-                            continue
-                        dict = {key: (converting_value(value, schema['properties'][key]) if value else None) for (key, value) in zip(columns, line)}
-                        new_bookmark['date'] = max(new_bookmark['date'], dict.get(self.replication_key))
-                        if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
-                            singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
-                            counter.increment()
-            new_bookmark['offset'] += 1
-        self.state["bookmarks"] = {self.name: new_bookmark}
-        self.write_state()
+            logger.info(f'Report {report_id} contain {len(files)} files')
+            bookmark.update({
+                'report_id': report_id,
+                'file_count': len(files),
+                'offset': 0,
+                'extract_date': str(datetime.now())[:10],
+                'extract_id': extract_id
+            })
+            
+            new_bookmark = bookmark
+            for count, file in enumerate(files):
+                if bookmark['offset'] > count:
+                    continue
+                    
+                data = self.client.extract_data(file.get('url'))
+                logger.info(f'Writing records for {self.name} from file : '+file.get('url'))
+                with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
+                    with singer.metrics.record_counter(endpoint=self.name) as counter:
+                        for line_count, line in enumerate(data):
+                            if line_count == 0:
+                                # remove first line
+                                continue
+                            dict = {key: (converting_value(value, schema['properties'][key]) if value else None) for (key, value) in zip(columns, line)}
+                            new_bookmark['date'] = max(new_bookmark['date'], dict.get(self.replication_key))
+                            if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
+                                singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
+                                counter.increment()
+                new_bookmark['offset'] += 1
+            self.state.update({"bookmarks": {self.name: {advertiser_id: new_bookmark}}})
+            self.write_state()
 

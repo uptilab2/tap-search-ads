@@ -53,7 +53,7 @@ Tap config.json parameters:
 - client_secret: authenticates your application
 - refresh_token: generates an access token to authorize your session
 - agency_id: unique identifier of your agency
-- advertiser_id: unique identifier of your advertiser
+- advertiser_id: list of unique identifier of your advertiser
 - engineAccount_id: unique identifier of the account in the external engine account
 - start_date: Inclusive date in YYYY-MM-DD format
 - replication_key: set the replication_key (default:'lastModifiedTimestamp' except for report conversion = 'conversionDate' and visit = 'visitDate').
