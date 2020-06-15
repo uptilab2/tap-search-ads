@@ -140,3 +140,7 @@ config.json
 state.json
 catalog.json
 data.json
+
+.DS_Store
+tap_searchads360/.DS_Store
+tap_searchads360/schemas/.DS_Store

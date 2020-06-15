@@ -248,12 +248,11 @@ class SearchAdsStream(Stream):
         }
         if 'end_date' in self.config:
             payloads['timeRange']['endDate'] = self.config['end_date'][:10]
-        # advertiser report is the only one who don't need engineAccount_id
-        if self.name != 'advertiser':
-            # if 'engineAccount_id' in self.config:
-            #     payloads['reportScope']['engineAccountId'] = self.config['engineAccount_id']
-            if 'advertiser_id' in self.config:
-                payloads['reportScope']['advertiserId'] = advertiser_id
+        if self.name != 'advertiser': # need the specific list here noqa
+            if 'engineAccount_id' in self.config and self.config['engineAccount_id']:
+                payloads['reportScope']['engineAccountId'] = self.config['engineAccount_id']
+        if advertiser_id:
+            payloads['reportScope']['advertiserId'] = advertiser_id
         if filters:
             payloads['filters'] = [{
                 "column": {"columnName" : f['field']},
@@ -265,7 +264,7 @@ class SearchAdsStream(Stream):
 
 
     def get_bookmark(self, advertiser_id):
-        bookmark = self.state.get('bookmarks', {}).get(self.name, {}).get(advertiser_id, {})
+        bookmark = singer.get_bookmark(self.state, self.name, advertiser_id, {})
         if not bookmark:
             bookmark['date'] = self.config.get('start_date')
         return bookmark
@@ -325,6 +324,6 @@ class SearchAdsStream(Stream):
                                 singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
                                 counter.increment()
                 new_bookmark['offset'] += 1
-            self.state.update({"bookmarks": {self.name: {advertiser_id: new_bookmark}}})
+            self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
             self.write_state()
 
