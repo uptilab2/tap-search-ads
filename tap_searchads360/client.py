@@ -82,15 +82,17 @@ class GoogleSearchAdsClient:
         
         response = req(url=url, **kwargs)
         logger.info(f'request api: {url}, response status: {response.status_code}')
-        resp = response.json()
         if response.status_code == 200 or response.status_code == 202:
             return response
-        elif response.status_code == 429:
+
+        #handle error
+        error_response = response.json()
+        if response.status_code == 429:
             raise ClientTooManyRequestError(f'Too many requests, retry ..')
-        elif response.status_code == 401 and resp['error']['errors'][0]['reason'] == 'expired':
+        elif response.status_code == 401 and error_response['error']['errors'][0]['reason'] == 'expired':
             raise ClientExpiredError(f'Token is expired, retry ..')
         else:
-            message = resp['error']['errors'][0]['message']
+            message = error_response['error']['errors'][0]['message']
             raise ClientHttpError(f'{response.status_code}: {message}')
 
     def request_report(self, payloads):
