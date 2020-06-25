@@ -246,8 +246,6 @@ class SearchAdsStream(Stream):
             'maxRowsPerFile': 1000000, # min rows value
             'statisticsCurrency': 'agency'
         }
-        if 'end_date' in self.config:
-            payloads['timeRange']['endDate'] = self.config['end_date'][:10]
         if self.name != 'advertiser': # need the specific list here noqa
             if 'engineAccount_id' in self.config and self.config['engineAccount_id']:
                 payloads['reportScope']['engineAccountId'] = self.config['engineAccount_id']
@@ -277,13 +275,14 @@ class SearchAdsStream(Stream):
             bookmark = self.get_bookmark(advertiser_id)
             report_id = ''
             files = []
-            #check start_date
+            
             yesterday = datetime.now() - timedelta(days=1)
-            default_end_date = yesterday.strftime('%Y-%m-%d')
-            if bookmark['date'][:10] > str(yesterday):
+            end_date = self.config['end_date'] if 'end_date' in self.config and self.config['end_date'] else str(yesterday.strftime('%Y-%m-%d'))
+            #check start_date and end_date offset
+            if bookmark['date'][:10] > end_date:
                 raise DateRangeError(f"start_date should be at least 1 days ago")
 
-            request_body = self.request_body(self.config['agency_id'], advertiser_id, columns, bookmark['date'][:10], default_end_date, filters=self.filters)
+            request_body = self.request_body(self.config['agency_id'], advertiser_id, columns, bookmark['date'][:10], end_date[:10], filters=self.filters)
             
             extract_id = hashlib.md5(json.dumps(request_body).encode("utf-8")).hexdigest()
             # bookmark report_id, if something wrong happen use it to get files again, extract_id is to verify if its the same request
