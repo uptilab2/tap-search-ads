@@ -244,7 +244,6 @@ class SearchAdsStream(Stream):
             },
             'downloadFormat': 'CSV',
             'maxRowsPerFile': 1000000, # min rows value
-            'statisticsCurrency': 'agency'
         }
         if self.name != 'advertiser': # need the specific list here noqa
             if 'engineAccount_id' in self.config and self.config['engineAccount_id']:
