@@ -275,10 +275,8 @@ class SearchAdsStream(Stream):
             bookmark = self.get_bookmark(advertiser_id)
             report_id = ''
             files = []
-            logger.info(f'----------------------startdate---------------------- {bookmark}')
             yesterday = datetime.now() - timedelta(days=1)
             end_date = self.config['end_date'] if 'end_date' in self.config and self.config['end_date'] else str(yesterday.strftime('%Y-%m-%d'))
-            logger.info(f'--------------------endate------------------------ {end_date}')
 
             #check start_date and end_date offset
             if bookmark['date'][:10] > end_date:
@@ -324,11 +322,7 @@ class SearchAdsStream(Stream):
                             if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
                                 singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
                                 counter.increment()
-                            else:
-                                logger.info(bookmark['date'])
-                                logger.info(self.replication_key)
-                                logger.info(dict.get(self.replication_key))
-                                logger.info('JOIAZJDOIAJIODOAIJDOJAJDIOAJDIO NONONONONO')
+
                 new_bookmark['offset'] += 1
             self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
             self.write_state()
