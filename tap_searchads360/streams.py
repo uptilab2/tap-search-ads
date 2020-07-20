@@ -112,6 +112,12 @@ def converting_value(value, type):
     except:
         return str(value)
 
+def parsing_filter_value(value, check_type = int):
+    # try casting type from jsonconfig
+    try:
+        return check_type(value)
+    except:
+        return parsing_filter_value(value, check_type=float) if check_type is int else str(value)
 
 class DateRangeError(Exception):
     pass
@@ -255,9 +261,11 @@ class SearchAdsStream(Stream):
             payloads['filters'] = [{
                 "column": {"columnName" : f['field']},
                 "operator": f['operator'],
-                "values": [f['value']],
+                "values": [parsing_filter_value(f['value'])],
             }
             for f in filters]
+        logger.info(payloads)
+        exit
         return payloads
 
 
