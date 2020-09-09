@@ -331,8 +331,6 @@ class SearchAdsStream(Stream):
                                 counter.increment()
 
                 new_bookmark['offset'] += 1
-                self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
-                self.write_state()
             # when everything is done save the date, we can't order by column only with synchronous report
             new_bookmark['date'] = max_date
             self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
