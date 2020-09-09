@@ -290,7 +290,9 @@ class SearchAdsStream(Stream):
             #check start_date and end_date offset
             if bookmark['date'][:10] > end_date:
                 raise DateRangeError(f"start_date should be at least 1 days ago")
-            save_max_date = bookmark['date'][:10]
+
+            max_date = bookmark['date'][:10]
+
             request_body = self.request_body(self.config['agency_id'], advertiser_id, columns, bookmark['date'][:10], end_date[:10], filters=self.filters)
             
             # bookmark report_id, if something wrong happen use it to get files again, extract_id is to verify if its the same request
@@ -323,7 +325,7 @@ class SearchAdsStream(Stream):
                                 # remove first line
                                 continue
                             dict = {key: (converting_value(value, schema['properties'][key]) if value else None) for (key, value) in zip(columns, line)}
-                            save_max_date = max(save_max_date, dict.get(self.replication_key))
+                            max_date = max(max_date, dict.get(self.replication_key))
                             if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
                                 singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
                                 counter.increment()
@@ -332,7 +334,7 @@ class SearchAdsStream(Stream):
                 self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
                 self.write_state()
             # when everything is done save the date, we can't order by column only with synchronous report
-            new_bookmark['date'] = save_max_date
+            new_bookmark['date'] = max_date
             self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
             self.write_state()
-            
+
