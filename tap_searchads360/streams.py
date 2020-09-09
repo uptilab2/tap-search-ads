@@ -311,7 +311,7 @@ class SearchAdsStream(Stream):
             })
             
             new_bookmark = copy(bookmark)
-            for count, file in enumerate(reversed(files)):
+            for count, file in enumerate(files):
                 if bookmark['offset'] > count:
                     continue
                     
