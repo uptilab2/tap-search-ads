@@ -332,6 +332,6 @@ class SearchAdsStream(Stream):
                                 counter.increment()
 
                 new_bookmark['offset'] += 1
-            self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
-            self.write_state()
+                self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
+                self.write_state()
 
