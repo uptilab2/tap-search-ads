@@ -281,6 +281,7 @@ class SearchAdsStream(Stream):
         advertiser_ids = self.config['advertiser_id'] if  isinstance(self.config['advertiser_id'], list) else [self.config['advertiser_id']]
         for advertiser_id in advertiser_ids:
             bookmark = self.get_bookmark(advertiser_id)
+            logger.info(bookmark)
             report_id = ''
             files = []
             yesterday = datetime.now() - timedelta(days=1)
@@ -292,12 +293,10 @@ class SearchAdsStream(Stream):
 
             request_body = self.request_body(self.config['agency_id'], advertiser_id, columns, bookmark['date'][:10], end_date[:10], filters=self.filters)
             
-            extract_id = hashlib.md5(json.dumps(request_body).encode("utf-8")).hexdigest()
             # bookmark report_id, if something wrong happen use it to get files again, extract_id is to verify if its the same request
             if bookmark.get('report_id', None)\
-            and bookmark.get('offset') != bookmark.get('file_count')\
-            and bookmark['extract_date'][:10] == str(datetime.now())[:10]\
-            and bookmark['extract_id'] == extract_id:
+            and bookmark.get('offset') < bookmark.get('file_count')\
+            and bookmark['extract_date'][:10] == str(datetime.now())[:10]:
                 report_id, files = self.client.get_report_files(saved_report_id=bookmark.get('report_id'))
 
             if not report_id and not files:
@@ -308,12 +307,11 @@ class SearchAdsStream(Stream):
                 'report_id': report_id,
                 'file_count': len(files),
                 'offset': 0,
-                'extract_date': str(datetime.now())[:10],
-                'extract_id': extract_id
+                'extract_date': str(datetime.now())[:10]
             })
             
             new_bookmark = copy(bookmark)
-            for count, file in enumerate(files):
+            for count, file in enumerate(reversed(files)):
                 if bookmark['offset'] > count:
                     continue
                     
@@ -334,4 +332,4 @@ class SearchAdsStream(Stream):
                 new_bookmark['offset'] += 1
                 self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
                 self.write_state()
-
+            
