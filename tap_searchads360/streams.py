@@ -329,8 +329,10 @@ class SearchAdsStream(Stream):
                             if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
                                 singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
                                 counter.increment()
-
+                # save between each file for retry purpose
                 new_bookmark['offset'] += 1
+                self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
+                self.write_state()
             # when everything is done save the date, we can't order by column only with synchronous report
             new_bookmark['date'] = max_date
             self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
