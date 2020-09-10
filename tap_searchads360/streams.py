@@ -281,6 +281,7 @@ class SearchAdsStream(Stream):
         advertiser_ids = self.config['advertiser_id'] if  isinstance(self.config['advertiser_id'], list) else [self.config['advertiser_id']]
         for advertiser_id in advertiser_ids:
             bookmark = self.get_bookmark(advertiser_id)
+            logger.info(bookmark)
             report_id = ''
             files = []
             yesterday = datetime.now() - timedelta(days=1)
@@ -290,27 +291,25 @@ class SearchAdsStream(Stream):
             if bookmark['date'][:10] > end_date:
                 raise DateRangeError(f"start_date should be at least 1 days ago")
 
+            max_date = bookmark['date'][:10]
+
             request_body = self.request_body(self.config['agency_id'], advertiser_id, columns, bookmark['date'][:10], end_date[:10], filters=self.filters)
             
-            extract_id = hashlib.md5(json.dumps(request_body).encode("utf-8")).hexdigest()
             # bookmark report_id, if something wrong happen use it to get files again, extract_id is to verify if its the same request
             if bookmark.get('report_id', None)\
-            and bookmark.get('offset') != bookmark.get('file_count')\
-            and bookmark['extract_date'][:10] == str(datetime.now())[:10]\
-            and bookmark['extract_id'] == extract_id:
+            and bookmark.get('offset') < bookmark.get('file_count')\
+            and bookmark['extract_date'][:10] == str(datetime.now())[:10]:
                 report_id, files = self.client.get_report_files(saved_report_id=bookmark.get('report_id'))
 
             if not report_id and not files:
                 report_id, files = self.client.get_report_files(request_body)
-
+                bookmark.update({
+                    'report_id': report_id,
+                    'file_count': len(files),
+                    'offset': 0,
+                    'extract_date': str(datetime.now())[:10]
+                })
             logger.info(f'Report {report_id} contain {len(files)} files')
-            bookmark.update({
-                'report_id': report_id,
-                'file_count': len(files),
-                'offset': 0,
-                'extract_date': str(datetime.now())[:10],
-                'extract_id': extract_id
-            })
             
             new_bookmark = copy(bookmark)
             for count, file in enumerate(files):
@@ -326,12 +325,16 @@ class SearchAdsStream(Stream):
                                 # remove first line
                                 continue
                             dict = {key: (converting_value(value, schema['properties'][key]) if value else None) for (key, value) in zip(columns, line)}
-                            new_bookmark['date'] = max(new_bookmark['date'], dict.get(self.replication_key))
+                            max_date = max(max_date, dict.get(self.replication_key))
                             if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
                                 singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
                                 counter.increment()
-
+                # save between each file for retry purpose
                 new_bookmark['offset'] += 1
+                self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
+                self.write_state()
+            # when everything is done save the date, we can't order by column only with synchronous report
+            new_bookmark['date'] = max_date
             self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
             self.write_state()
 
