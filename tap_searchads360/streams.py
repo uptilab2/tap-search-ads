@@ -12,64 +12,30 @@ SPECIFIC_REPLICATION_KEYS = [
     {'conversion': 'conversionDate'},
     {'visit': 'visitDate'}
 ]    
-AVAILABLE_SEGMENT = [
-    'date',
-    'monthStart',
-    'monthEnd',
-    'quarterStart',
-    'quarterEnd',
-    'weekStart',
-    'weekEnd',
-    'yearStart',
-    'yearEnd',
-    'deviceSegment',
-    'floodlightGroup',
-    'floodlightGroupId',
-    'floodlightGroupTag',
-    'floodlightActivity',
-    'floodlightActivityId',
-    'floodlightActivityTag',
-    'sitelinkDisplayText',
-    'sitelinkDescription1',
-    'sitelinkDescription2',
-    'sitelinkLandingPageUrl',
-    'sitelinkClickserverUrl',
-    'locationBusinessName',
-    'locationCategory',
-    'locationDetails',
-    'locationFilter',
-    'callPhoneNumber',
-    'callCountryCode',
-    'callIsTracked',
-    'callCallOnly',
-    'callConversionTracker',
-    'callConversionTrackerId',
-    'appId',
-    'appStore',
-    'feedItemId',
-    'feedId',
-    'feedType',
-    'accountId',
-    'campaign',
-    'adGroup',
-    'keywordId',
-    'keywordMatchType',
-    'keywordText',
-    'campaignId',
-    'adGroupId',
-    'ad',
-    'adId',
-    'isUnattributedAd',
-    'adHeadline',
-    'adHeadline2',
-    'adHeadline3',
-    'adDescription1',
-    'adDescription2',
-    'adDisplayUrl',
-    'adLandingPage',
-    'adType',
-    'adPromotionLine'
-]
+AVAILABLE_SEGMENT = {
+    'account': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
+    'ad': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
+    'advertiser': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
+    'adGroup': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag', 'sitelinkDisplayText', 'sitelinkDescription1', 'sitelinkDescription2', 'sitelinkLandingPageUrl', 'sitelinkClickserverUrl', 'locationBusinessName', 'locationCategory', 'locationDetails', 'locationFilter', 'callPhoneNumber', 'callCountryCode', 'callIsTracked', 'callCallOnly', 'callConversionTracker', 'callConversionTrackerId', 'appId', 'appStore', 'feedItemId', 'feedId', 'feedType'],
+    'adGroupTarget': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
+    'bidStrategy': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd'],
+    'campaign': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag', 'sitelinkDisplayText', 'sitelinkDescription1', 'sitelinkDescription2', 'sitelinkLandingPageUrl', 'sitelinkClickserverUrl', 'locationBusinessName', 'locationCategory', 'locationDetails', 'locationFilter', 'callPhoneNumber', 'callCountryCode', 'callIsTracked', 'callCallOnly', 'callConversionTracker', 'callConversionTrackerId', 'appId', 'appStore', 'feedItemId', 'feedId', 'feedType'],
+    'campaignTarget': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
+    'conversion': [],
+    'feedItem': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
+    'floodlightActivity': [],
+    'keyword': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag',  'ad', 'adId', 'isUnattributedAd', 'adHeadline', 'adHeadline2', 'adHeadline3', 'adDescription1', 'adDescription2', 'adDisplayUrl', 'adLandingPage', 'adType', 'adPromotionLine'],
+    'negativeAdGroupKeyword': [],
+    'negativeAdGroupTarget': [],
+    'negativeCampaignKeyword': [],
+    'negativeCampaignTarget': [],
+    'paidAndOrganic': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'campaign', 'campaignId', 'adGroup', 'adGroupId', 'keywordId', 'keywordMatchType', 'keywordText'],
+    'productAdvertised': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag', 'accountId', 'campaignId', 'adGroupId'],
+    'productGroup': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment'],
+    'productLeadAndCrossSell': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag', 'accountId', 'campaignId', 'adGroupId'],
+    'productTarget': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag']
+}
+
 AVAILABLE_STREAMS = [
     'account',
     'ad',
@@ -222,7 +188,7 @@ class SearchAdsStream(Stream):
             selected_fields = fields
         else:
             # select all except segments
-            selected_fields = [prop for prop in schema['properties'] if prop not in AVAILABLE_SEGMENT or prop == self.replication_key]
+            selected_fields = [prop for prop in schema['properties'] if prop not in AVAILABLE_SEGMENT[self.name] or prop == self.replication_key]
          
         for field in mdata:
             if field['breadcrumb']:
@@ -325,8 +291,8 @@ class SearchAdsStream(Stream):
                                 # remove first line
                                 continue
                             dict = {key: (converting_value(value, schema['properties'][key]) if value else None) for (key, value) in zip(columns, line)}
-                            max_date = max(max_date, dict.get(self.replication_key))
-                            if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key)[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
+                            max_date = max(max_date, dict.get(self.replication_key, ''))
+                            if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key, '')[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
                                 singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
                                 counter.increment()
                 # save between each file for retry purpose
