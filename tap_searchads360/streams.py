@@ -40,7 +40,8 @@ AVAILABLE_SEGMENT = {
     'productAdvertised': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag', 'accountId', 'campaignId', 'adGroupId'],
     'productGroup': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment'],
     'productLeadAndCrossSell': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag', 'accountId', 'campaignId', 'adGroupId'],
-    'productTarget': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag']
+    'productTarget': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
+    'visit': []
 }
 
 AVAILABLE_STREAMS = [
