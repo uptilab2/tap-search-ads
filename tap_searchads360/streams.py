@@ -1,9 +1,10 @@
 import os
 import singer
-from copy import copy
 import hashlib
 import json
+from copy import copy
 from datetime import datetime, timedelta
+
 
 logger = singer.get_logger()
 
@@ -11,20 +12,26 @@ logger = singer.get_logger()
 SPECIFIC_REPLICATION_KEYS = [
     {'conversion': 'conversionDate'},
     {'visit': 'visitDate'}
-]    
+]
+
 AVAILABLE_SEGMENT = {
     'account': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
     'ad': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
     'advertiser': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
-    'adGroup': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag', 'sitelinkDisplayText', 'sitelinkDescription1', 'sitelinkDescription2', 'sitelinkLandingPageUrl', 'sitelinkClickserverUrl', 'locationBusinessName', 'locationCategory', 'locationDetails', 'locationFilter', 'callPhoneNumber', 'callCountryCode', 'callIsTracked', 'callCallOnly', 'callConversionTracker', 'callConversionTrackerId', 'appId', 'appStore', 'feedItemId', 'feedId', 'feedType'],
+    'adGroup': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag',
+                'sitelinkDisplayText', 'sitelinkDescription1', 'sitelinkDescription2', 'sitelinkLandingPageUrl', 'sitelinkClickserverUrl', 'locationBusinessName', 'locationCategory', 'locationDetails', 'locationFilter', 'callPhoneNumber', 'callCountryCode', 'callIsTracked', 'callCallOnly',
+                'callConversionTracker', 'callConversionTrackerId', 'appId', 'appStore', 'feedItemId', 'feedId', 'feedType'],
     'adGroupTarget': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
     'bidStrategy': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd'],
-    'campaign': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag', 'sitelinkDisplayText', 'sitelinkDescription1', 'sitelinkDescription2', 'sitelinkLandingPageUrl', 'sitelinkClickserverUrl', 'locationBusinessName', 'locationCategory', 'locationDetails', 'locationFilter', 'callPhoneNumber', 'callCountryCode', 'callIsTracked', 'callCallOnly', 'callConversionTracker', 'callConversionTrackerId', 'appId', 'appStore', 'feedItemId', 'feedId', 'feedType'],
+    'campaign': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag',
+                 'sitelinkDisplayText', 'sitelinkDescription1', 'sitelinkDescription2', 'sitelinkLandingPageUrl', 'sitelinkClickserverUrl', 'locationBusinessName', 'locationCategory', 'locationDetails', 'locationFilter', 'callPhoneNumber', 'callCountryCode', 'callIsTracked', 'callCallOnly',
+                 'callConversionTracker', 'callConversionTrackerId', 'appId', 'appStore', 'feedItemId', 'feedId', 'feedType'],
     'campaignTarget': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
     'conversion': [],
     'feedItem': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag'],
     'floodlightActivity': [],
-    'keyword': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag',  'ad', 'adId', 'isUnattributedAd', 'adHeadline', 'adHeadline2', 'adHeadline3', 'adDescription1', 'adDescription2', 'adDisplayUrl', 'adLandingPage', 'adType', 'adPromotionLine'],
+    'keyword': ['date', 'monthStart', 'monthEnd', 'quarterStart', 'quarterEnd', 'weekStart', 'weekEnd', 'yearStart', 'yearEnd', 'deviceSegment', 'floodlightGroup', 'floodlightGroupId', 'floodlightGroupTag', 'floodlightActivity', 'floodlightActivityId', 'floodlightActivityTag',
+                'ad', 'adId', 'isUnattributedAd', 'adHeadline', 'adHeadline2', 'adHeadline3', 'adDescription1', 'adDescription2', 'adDisplayUrl', 'adLandingPage', 'adType', 'adPromotionLine'],
     'negativeAdGroupKeyword': [],
     'negativeAdGroupTarget': [],
     'negativeCampaignKeyword': [],
