@@ -296,8 +296,9 @@ class SearchAdsStream(Stream):
                 logger.info(f'Request a report from {start_date} to {end_date}')
                 request_body = self.request_body(self.config['agency_id'], advertiser_id, columns, start_date[:10], end_date[:10], filters=self.filters)
                 
-                # bookmark report_id, if something wrong happen use it to get files again, extract_id is to verify if its the same request
+                # bookmark report_id, if something wrong happen use it to get files again
                 if bookmark.get('report_id', None)\
+                and not bookmark.get('complete', False)\
                 and bookmark.get('offset') < bookmark.get('file_count')\
                 and bookmark['extract_date'][:10] == str(datetime.now())[:10]:
                     report_id, files = self.client.get_report_files(saved_report_id=bookmark.get('report_id'))
@@ -308,7 +309,8 @@ class SearchAdsStream(Stream):
                         'report_id': report_id,
                         'file_count': len(files),
                         'offset': 0,
-                        'extract_date': str(datetime.now())[:10]
+                        'extract_date': str(datetime.now())[:10],
+                        'complete': False
                     })
                 logger.info(f'Report {report_id} contain {len(files)} files')
                 
@@ -336,6 +338,7 @@ class SearchAdsStream(Stream):
                     self.write_state()
                 # when everything is done save the date, we can't order by column only with synchronous report
                 new_bookmark['date'] = max_date
+                new_bookmark['complete'] = True
                 self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
                 self.write_state()
 
