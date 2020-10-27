@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 logger = singer.get_logger()
 
 
-LIMIT_DAYS_PER_REPORT = 20
+LIMIT_DAYS_PER_REPORT = 365
 
 SPECIFIC_REPLICATION_KEYS = [
     {'conversion': 'conversionDate'},
@@ -283,8 +283,7 @@ class SearchAdsStream(Stream):
         advertiser_ids = self.config['advertiser_id'] if  isinstance(self.config['advertiser_id'], list) else [self.config['advertiser_id']]
         for advertiser_id in advertiser_ids:
             bookmark = self.get_bookmark(advertiser_id)
-            report_id = ''
-            files = []
+
             yesterday = datetime.now() - timedelta(days=1)
             start_date = bookmark['date'][:10]
             end_date = self.config['end_date'] if 'end_date' in self.config and self.config['end_date'] else str(yesterday.strftime('%Y-%m-%d'))
@@ -293,6 +292,9 @@ class SearchAdsStream(Stream):
             # get date ranges split into multiple dates ranges of 365 days interval
             date_ranges = self.get_date_range_request(start_date, end_date)
             for start_date, end_date in date_ranges:
+                bookmark = self.get_bookmark(advertiser_id)
+                report_id = ''
+                files = []
                 logger.info(f'Request a report from {start_date} to {end_date}')
                 request_body = self.request_body(self.config['agency_id'], advertiser_id, columns, start_date[:10], end_date[:10], filters=self.filters)
                 
