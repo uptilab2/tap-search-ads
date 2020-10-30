@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 logger = singer.get_logger()
 
 
+LIMIT_DAYS_PER_REPORT = 365
+
 SPECIFIC_REPLICATION_KEYS = [
     {'conversion': 'conversionDate'},
     {'visit': 'visitDate'}
@@ -211,6 +213,33 @@ class SearchAdsStream(Stream):
         self.write_schema(columns)
         self.sync(columns, metadata)
 
+    def get_date_range_request(self, start_date, end_date):
+        #check start_date and end_date offset
+        if start_date >= end_date:
+            raise DateRangeError(f"start_date should be at least 1 days ago")
+
+        start = datetime.strptime(start_date, '%Y-%m-%d')
+        end = datetime.strptime(end_date, '%Y-%m-%d')
+        delta = end - start
+        days = delta.days
+        dates = []
+        end_range = end
+        while days > LIMIT_DAYS_PER_REPORT:
+            end_range = start + timedelta(days=LIMIT_DAYS_PER_REPORT)
+            dates.append(
+                (f'{start.year}-{start.month:02}-{start.day:02}T00:00:00Z',
+                 f'{end_range.year}-{end_range.month:02}-{end_range.day:02}T00:00:00Z')
+            )
+            start = end_range
+            delta = end - start
+            days = delta.days
+        else:
+            dates.append(
+                (f'{start.year}-{start.month:02}-{start.day:02}T00:00:00Z',
+                f'{end.year}-{end.month:02}-{end.day:02}T00:00:00Z')
+            )
+        return dates
+
     def request_body(self, agency_id, advertiser_id, columns, start_date, end_date, filters=None):
         payloads = {
             'reportScope':{
@@ -238,7 +267,6 @@ class SearchAdsStream(Stream):
                 "values": [parsing_filter_value(f['value'])],
             }
             for f in filters]
-        logger.info(payloads)
         exit
         return payloads
 
@@ -255,60 +283,64 @@ class SearchAdsStream(Stream):
         advertiser_ids = self.config['advertiser_id'] if  isinstance(self.config['advertiser_id'], list) else [self.config['advertiser_id']]
         for advertiser_id in advertiser_ids:
             bookmark = self.get_bookmark(advertiser_id)
-            logger.info(bookmark)
-            report_id = ''
-            files = []
+
             yesterday = datetime.now() - timedelta(days=1)
+            start_date = bookmark['date'][:10]
             end_date = self.config['end_date'] if 'end_date' in self.config and self.config['end_date'] else str(yesterday.strftime('%Y-%m-%d'))
-
-            #check start_date and end_date offset
-            if bookmark['date'][:10] > end_date:
-                raise DateRangeError(f"start_date should be at least 1 days ago")
-
             max_date = bookmark['date'][:10]
 
-            request_body = self.request_body(self.config['agency_id'], advertiser_id, columns, bookmark['date'][:10], end_date[:10], filters=self.filters)
-            
-            # bookmark report_id, if something wrong happen use it to get files again, extract_id is to verify if its the same request
-            if bookmark.get('report_id', None)\
-            and bookmark.get('offset') < bookmark.get('file_count')\
-            and bookmark['extract_date'][:10] == str(datetime.now())[:10]:
-                report_id, files = self.client.get_report_files(saved_report_id=bookmark.get('report_id'))
+            # get date ranges split into multiple dates ranges of 365 days interval
+            date_ranges = self.get_date_range_request(start_date, end_date)
+            for start_date, end_date in date_ranges:
+                bookmark = self.get_bookmark(advertiser_id)
+                report_id = ''
+                files = []
+                logger.info(f'Request a report from {start_date} to {end_date}')
+                request_body = self.request_body(self.config['agency_id'], advertiser_id, columns, start_date[:10], end_date[:10], filters=self.filters)
+                
+                # bookmark report_id, if something wrong happen use it to get files again
+                if bookmark.get('report_id', None)\
+                and not bookmark.get('complete', False)\
+                and bookmark.get('offset') < bookmark.get('file_count')\
+                and bookmark['extract_date'][:10] == str(datetime.now())[:10]:
+                    report_id, files = self.client.get_report_files(saved_report_id=bookmark.get('report_id'))
 
-            if not report_id and not files:
-                report_id, files = self.client.get_report_files(request_body)
-                bookmark.update({
-                    'report_id': report_id,
-                    'file_count': len(files),
-                    'offset': 0,
-                    'extract_date': str(datetime.now())[:10]
-                })
-            logger.info(f'Report {report_id} contain {len(files)} files')
-            
-            new_bookmark = copy(bookmark)
-            for count, file in enumerate(files):
-                if bookmark['offset'] > count:
-                    continue
-                    
-                data = self.client.extract_data(file.get('url'))
-                logger.info(f'Writing records for {self.name} from file : '+file.get('url'))
-                with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
-                    with singer.metrics.record_counter(endpoint=self.name) as counter:
-                        for line_count, line in enumerate(data):
-                            if line_count == 0:
-                                # remove first line
-                                continue
-                            dict = {key: (converting_value(value, schema['properties'][key]) if value else None) for (key, value) in zip(columns, line)}
-                            max_date = max(max_date, dict.get(self.replication_key, ''))
-                            if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key, '')[:10] >= bookmark['date'][:10]) or self.replication_method == 'FULL_TABLE':
-                                singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
-                                counter.increment()
-                # save between each file for retry purpose
-                new_bookmark['offset'] += 1
+                if not report_id and not files:
+                    report_id, files = self.client.get_report_files(request_body)
+                    bookmark.update({
+                        'report_id': report_id,
+                        'file_count': len(files),
+                        'offset': 0,
+                        'extract_date': str(datetime.now())[:10],
+                        'complete': False
+                    })
+                logger.info(f'Report {report_id} contain {len(files)} files')
+                
+                new_bookmark = copy(bookmark)
+                for count, file in enumerate(files):
+                    if bookmark['offset'] > count:
+                        continue
+                        
+                    data = self.client.extract_data(file.get('url'))
+                    logger.info(f'Writing records for {self.name} from file : '+file.get('url'))
+                    with singer.metrics.job_timer(job_type=f'list_{self.name}') as timer:
+                        with singer.metrics.record_counter(endpoint=self.name) as counter:
+                            for line_count, line in enumerate(data):
+                                if line_count == 0:
+                                    # remove first line
+                                    continue
+                                dict = {key: (converting_value(value, schema['properties'][key]) if value else None) for (key, value) in zip(columns, line)}
+                                max_date = max(max_date, dict.get(self.replication_key, ''))
+                                if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key, '')[:10] >= start_date[:10]) or self.replication_method == 'FULL_TABLE':
+                                    singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
+                                    counter.increment()
+                    # save between each file for retry purpose
+                    new_bookmark['offset'] += 1
+                    self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
+                    self.write_state()
+                # when everything is done save the date, we can't order by column only with synchronous report
+                new_bookmark['date'] = max_date
+                new_bookmark['complete'] = True
                 self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
                 self.write_state()
-            # when everything is done save the date, we can't order by column only with synchronous report
-            new_bookmark['date'] = max_date
-            self.state = singer.write_bookmark(self.state, self.name, advertiser_id, new_bookmark)
-            self.write_state()
 
