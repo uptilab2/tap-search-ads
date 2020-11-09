@@ -286,7 +286,7 @@ class SearchAdsStream(Stream):
 
             yesterday = datetime.now() - timedelta(days=1)
             start_date = bookmark['date'][:10]
-            end_date = self.config['end_date'] if 'end_date' in self.config and self.config['end_date'] else str(yesterday.strftime('%Y-%m-%d'))
+            end_date = self.config['end_date'][:10] if 'end_date' in self.config and self.config['end_date'] else str(yesterday.strftime('%Y-%m-%d'))
             max_date = bookmark['date'][:10]
 
             # get date ranges split into multiple dates ranges of 365 days interval

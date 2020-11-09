@@ -137,5 +137,5 @@ class GoogleSearchAdsClient:
     def extract_data(self, file_url):
         # To download file we have to set the token on the header
         headers = {'Authorization': 'Bearer '+self.access_token}
-        response = self.do_request(file_url, headers=headers, stream=True)
+        response = self.do_request(file_url, headers=headers)
         return csv.reader(io.StringIO(response.content.decode('utf-8')))
