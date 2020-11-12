@@ -89,7 +89,7 @@ class GoogleSearchAdsClient:
         error_response = response.json()
         if response.status_code == 429:
             raise ClientTooManyRequestError(f'Too many requests, retry ..')
-        elif response.status_code == 401 and error_response['error']['errors'][0]['reason'] == 'expired':
+        elif response.status_code == 401:
             raise ClientExpiredError(f'Token is expired, retry ..')
         else:
             message = error_response['error']['errors'][0]['message']
