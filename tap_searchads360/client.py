@@ -69,7 +69,7 @@ class GoogleSearchAdsClient:
             message = resp['error']['errors'][0]['message']
             raise ClientHttpError(f'Status code {response.status_code}: {message}')
         
-    @backoff.on_exception(backoff.expo, (ClientTooManyRequestError, ClientExpiredError), max_tries=3)
+    @backoff.on_exception(backoff.expo, (ClientTooManyRequestError, ClientExpiredError), max_tries=7)
     def do_request(self, url, **kwargs):
         self.get_access_token()
 
@@ -137,5 +137,5 @@ class GoogleSearchAdsClient:
     def extract_data(self, file_url):
         # To download file we have to set the token on the header
         headers = {'Authorization': 'Bearer '+self.access_token}
-        response = self.do_request(file_url, headers=headers)
+        response = self.do_request(file_url, headers=headers, stream=True)
         return csv.reader(io.StringIO(response.content.decode('utf-8')))

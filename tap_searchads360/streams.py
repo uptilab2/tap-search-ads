@@ -252,7 +252,7 @@ class SearchAdsStream(Stream):
                 'endDate': end_date
             },
             'downloadFormat': 'CSV',
-            'maxRowsPerFile': 1000000, # min rows value
+            'maxRowsPerFile': 100000000,  # min rows value
             'statisticsCurrency': self.config['currency'] if 'currency' in self.config and self.config['currency'] in ('agency', 'advertiser', 'account', 'usd') else 'usd' # noqa
         }
         if self.name != 'advertiser': # need the specific list here noqa
