@@ -297,7 +297,7 @@ class SearchAdsStream(Stream):
                 files = []
                 logger.info(f'Request a report from {start_date} to {end_date}')
                 request_body = self.request_body(self.config['agency_id'], advertiser_id, columns, start_date[:10], end_date[:10], filters=self.filters)
-                
+                logger.info(request_body)
                 # bookmark report_id, if something wrong happen use it to get files again
                 if bookmark.get('report_id', None)\
                 and not bookmark.get('complete', False)\
