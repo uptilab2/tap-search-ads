@@ -252,7 +252,7 @@ class SearchAdsStream(Stream):
                 'endDate': end_date
             },
             'downloadFormat': 'CSV',
-            'maxRowsPerFile': 100000000,  # min rows value
+            'maxRowsPerFile': 100000000,  # max rows value
             'statisticsCurrency': self.config['currency'] if 'currency' in self.config and self.config['currency'] in ('agency', 'advertiser', 'account', 'usd') else 'usd' # noqa
         }
         if self.name != 'advertiser': # need the specific list here noqa
@@ -331,7 +331,7 @@ class SearchAdsStream(Stream):
                                     continue
                                 dict = {key: (converting_value(value, schema['properties'][key]) if value else None) for (key, value) in zip(columns, line)}
                                 max_date = max(max_date, dict.get(self.replication_key, ''))
-                                if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key, '')[:10] >= start_date[:10]) or self.replication_method == 'FULL_TABLE':
+                                if (self.replication_method == 'INCREMENTAL' and dict.get(self.replication_key, '')[:10] > start_date[:10]) or self.replication_method == 'FULL_TABLE':
                                     singer.write_record(stream_name=self.name, time_extracted=singer.utils.now(), record=dict)
                                     counter.increment()
                     # save between each file for retry purpose

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 logger = singer.get_logger()
 BASE_API_URL = 'https://www.googleapis.com/doubleclicksearch/v2/reports'
 GOOGLE_TOKEN_URI = 'https://accounts.google.com/o/oauth2/token'
-POLLING_TIME = 30 # 1 minute is the recommandation but we adjust it for 30sec (testing)
+POLLING_TIME = 60 # 1 minute is the recommandation
 
 class ClientHttpError(Exception):
     pass
