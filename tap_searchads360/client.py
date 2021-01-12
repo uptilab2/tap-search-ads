@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 logger = singer.get_logger()
 BASE_API_URL = 'https://www.googleapis.com/doubleclicksearch/v2/reports'
 GOOGLE_TOKEN_URI = 'https://accounts.google.com/o/oauth2/token'
-POLLING_TIME = 30 # 1 minute is the recommandation but we adjust it for 30sec (testing)
+POLLING_TIME = 60 # 1 minute is the recommandation
 
 class ClientHttpError(Exception):
     pass
@@ -69,7 +69,7 @@ class GoogleSearchAdsClient:
             message = resp['error']['errors'][0]['message']
             raise ClientHttpError(f'Status code {response.status_code}: {message}')
         
-    @backoff.on_exception(backoff.expo, (ClientTooManyRequestError, ClientExpiredError), max_tries=3)
+    @backoff.on_exception(backoff.expo, (ClientTooManyRequestError, ClientExpiredError), max_tries=7)
     def do_request(self, url, **kwargs):
         self.get_access_token()
 
@@ -89,7 +89,7 @@ class GoogleSearchAdsClient:
         error_response = response.json()
         if response.status_code == 429:
             raise ClientTooManyRequestError(f'Too many requests, retry ..')
-        elif response.status_code == 401 and error_response['error']['errors'][0]['reason'] == 'expired':
+        elif response.status_code == 401:
             raise ClientExpiredError(f'Token is expired, retry ..')
         else:
             message = error_response['error']['errors'][0]['message']
@@ -137,5 +137,5 @@ class GoogleSearchAdsClient:
     def extract_data(self, file_url):
         # To download file we have to set the token on the header
         headers = {'Authorization': 'Bearer '+self.access_token}
-        response = self.do_request(file_url, headers=headers)
+        response = self.do_request(file_url, headers=headers, stream=True)
         return csv.reader(io.StringIO(response.content.decode('utf-8')))
