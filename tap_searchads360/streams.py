@@ -275,6 +275,10 @@ class SearchAdsStream(Stream):
         bookmark = singer.get_bookmark(self.state, self.name, advertiser_id, {})
         if not bookmark:
             bookmark['date'] = self.config.get('start_date')
+        else:
+            if 'offset_start_date' in self.config and self.config.get('offset_start_date', 0):
+                start = datetime.strptime(bookmark['date'][:10], '%Y-%m-%d') - timedelta(days=int(self.config.get('offset_start_date')))
+                bookmark['date'] = f'{start.year}-{start.month:02}-{start.day:02}T00:00:00Z'
         return bookmark
 
     def sync(self, columns, mdata):
