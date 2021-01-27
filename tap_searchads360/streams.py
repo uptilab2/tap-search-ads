@@ -277,7 +277,7 @@ class SearchAdsStream(Stream):
             bookmark['date'] = self.config.get('start_date')
         else:
             if 'offset_start_date' in self.config and self.config.get('offset_start_date', 0):
-                start = datetime.strptime(bookmark['date'][:10], '%Y-%m-%d') - timedelta(days=int(self.config.get('offset_start_date')))
+                start = datetime.strptime(bookmark['date'][:10], '%Y-%m-%d') - timedelta(days=int(self.config.get('offset_start_date', 0)))
                 bookmark['date'] = f'{start.year}-{start.month:02}-{start.day:02}T00:00:00Z'
         return bookmark
 
